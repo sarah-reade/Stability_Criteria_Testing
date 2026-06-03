@@ -1,5 +1,5 @@
-#ifndef ETHERNET_Wrap_HPP
-#define ETHERNET_Wrap_HPP
+#ifndef ETHERNET_WRAP_HPP
+#define ETHERNET_WRAP_HPP
 
 
 #include <NativeEthernet.h>
@@ -91,6 +91,7 @@ struct EthernetWrapper
 
     bool send_packets(const EthernetWrapperMsg &packet)
     {
+      
       // check client connected
       if(!connect_client(0.1))
       {

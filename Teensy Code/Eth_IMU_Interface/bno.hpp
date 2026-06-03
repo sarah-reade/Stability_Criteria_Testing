@@ -1,7 +1,7 @@
 #ifndef BNO_HPP
 #define BNO_HPP
 
-#define DEBUG_BNO
+//#define DEBUG_BNO
 
 #include <Wire.h>
 #include "SparkFun_BNO08x_Arduino_Library.h" 
@@ -11,7 +11,7 @@
 bool set_reports(BNO08x_Copy *bno)
 {
   
-  if (bno->enableReports == true)
+  if (bno->enableReport(SH2_GYROSCOPE_CALIBRATED) == true)
   {
 #ifdef DEBUG_BNO
     Serial.println(F("Gyroscope enabled"));
@@ -68,13 +68,19 @@ bool initialise_bno(BNO08x_Copy *bno, uint8_t address, TwoWire &wirePort, int8_t
   //wirePort.begin();
   delay(200);
   if (!bno->begin(address, wirePort, intpin, rstpin)) {
+#ifdef DEBUG_BNO
     Serial.printf("BNO08x not detected at address 0x%02X on bus. Check wiring.\n", address);
+#endif
     return false;
   }
+#ifdef DEBUG_BNO
   Serial.printf("BNO08x found at 0x%02X\n", address);
+#endif
   delay(10);
   if (!set_reports(bno)) {
+#ifdef DEBUG_BNO
     Serial.println("BNO08x: could not enable reports");
+#endif
     return false;
   }
   delay(10);
@@ -89,13 +95,19 @@ bool initialise_bno(BNO08x *bno, uint8_t address, TwoWire &wirePort, int8_t intp
   //wirePort.begin();
   delay(200);
   if (!bno->begin(address, wirePort, intpin, rstpin)) {
+#ifdef DEBUG_BNO
     Serial.printf("BNO08x not detected at address 0x%02X on bus. Check wiring.\n", address);
+#endif
     return false;
   }
+#ifdef DEBUG_BNO
   Serial.printf("BNO08x found at 0x%02X\n", address);
+#endif
   delay(10);
   if (!set_reports(bno)) {
+#ifdef DEBUG_BNO
     Serial.println("BNO08x: could not enable reports");
+#endif
     return false;
   }
   delay(10);
@@ -108,7 +120,7 @@ struct BnoData
   uint8_t linAcc,gyrAcc;
 
   // Define min/max for each value 
-  bool flag;
+  bool flag[];
 
   BnoData (BNO08x *bno):  linX(0),
                           linY(0),
@@ -120,7 +132,9 @@ struct BnoData
                           gyrAcc(0)
   {
     if (bno->wasReset()) {
+#ifdef DEBUG_BNO
       Serial.println("sensor was reset ");
+#endif
       if(!set_reports(bno))
       {
         return;
@@ -138,21 +152,23 @@ struct BnoData
         linY = bno->getLinAccelY();
         linZ = bno->getLinAccelZ();
         linAcc = bno->getLinAccelAccuracy();
-        flag = true;
+        flag[0] = true;
+#ifdef DEBUG_BNO
+        Serial.printf("Linear Accel - X: %.3f, Y: %.3f, Z: %.3f, Accuracy: %d\n", linX, linY, linZ, linAcc);
+#endif
 
       }
       else if (bno->getSensorEventID() == SH2_GYROSCOPE_CALIBRATED) {
 
         gyrX = bno->getGyroX();
-        gyrY = bno->getGyroX();
-        gyrZ = bno->getGyroX();
+        gyrY = bno->getGyroY();
+        gyrZ = bno->getGyroZ();
         gyrAcc = bno->getGyroAccuracy();
-        flag = true;
+        flag[1] = true;
 
-      }
-      else
-      {
-        flag = false;
+#ifdef DEBUG_BNO
+        Serial.printf("Gyroscope - X: %.3f, Y: %.3f, Z: %.3f, Accuracy: %d\n", gyrX, gyrY, gyrZ, gyrAcc);
+#endif
       }
 
     }
@@ -170,7 +186,9 @@ struct BnoData
                           gyrAcc(0)
   {
     if (bno->wasReset()) {
+#ifdef DEBUG_BNO
       Serial.println("sensor was reset ");
+#endif
       if(!set_reports(bno))
       {
         return;
@@ -188,21 +206,23 @@ struct BnoData
         linY = bno->getLinAccelY();
         linZ = bno->getLinAccelZ();
         linAcc = bno->getLinAccelAccuracy();
-        flag = true;
+        flag[0] = true;
+#ifdef DEBUG_BNO
+        Serial.printf("Linear Accel - X: %.3f, Y: %.3f, Z: %.3f, Accuracy: %d\n", linX, linY, linZ, linAcc);
+#endif
 
       }
       else if (bno->getSensorEventID() == SH2_GYROSCOPE_CALIBRATED) {
 
         gyrX = bno->getGyroX();
-        gyrY = bno->getGyroX();
-        gyrZ = bno->getGyroX();
+        gyrY = bno->getGyroY();
+        gyrZ = bno->getGyroZ();
         gyrAcc = bno->getGyroAccuracy();
-        flag = true;
+        flag[1] = true;
 
-      }
-      else
-      {
-        flag = false;
+#ifdef DEBUG_BNO
+        Serial.printf("Gyroscope - X: %.3f, Y: %.3f, Z: %.3f, Accuracy: %d\n", gyrX, gyrY, gyrZ, gyrAcc);
+#endif
       }
 
     }
@@ -228,11 +248,10 @@ struct BnoData
   }
 
   bool packIMUtoEth(EthernetWrapperMsg &msg, uint8_t sensorID) {
-    if (!flag) {return false;}
+    if (!flag[0] || !flag[1]) {return false;}
 
-#ifdef DEBUG_BNO
-    Serial.println("Obtained Reading");
-#endif  
+    flag[0] = false;
+    flag[1] = false;
     
     // total payload size
     constexpr size_t payloadSize =
@@ -240,11 +259,14 @@ struct BnoData
         6 * sizeof(float) +
         2 * sizeof(uint8_t);
 
-    if (msg.data == nullptr) return false;
 
+#ifdef DEBUG_BNO
+    Serial.println("Obtained Reading");
+#endif  
     // IMPORTANT: ensure buffer is large enough externally
     // (no heap safety here)
-
+    uint8_t buffer[64]; 
+    msg.data = buffer;
     uint8_t* p = msg.data;
 
     // optional header
