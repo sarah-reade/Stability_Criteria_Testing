@@ -4,9 +4,8 @@
 
 #include <NativeEthernet.h>
 
-struct EthernetWrapperMsg
-{
-  uint8_t* data;
+struct EthernetWrapperMsg {
+  uint8_t data[64];
   size_t length;
 };
 
@@ -22,7 +21,7 @@ struct EthernetWrapper
     // address of desired control client
     IPAddress client_ip_;
 
-    // buffer for packets not yet processed
+    // // buffer for packets not yet processed
     std::vector<std::vector<byte>>  loose_packets_;
 
   public:
@@ -51,7 +50,7 @@ struct EthernetWrapper
     // Connect to client with timeout in seconds. TODO: Fix timeout
     bool connect_client(const float& client_timeout)
     {
-      float timeout = 1;
+      // float timeout = 1;
       // return if client connected
       if (client_.connected())
       {
@@ -66,7 +65,7 @@ struct EthernetWrapper
       unsigned long start_time = millis();
 
       // for timeout, loop to check for new clients
-      while(millis() - start_time < timeout*1000)
+      while (millis() - start_time < client_timeout * 1000)
       {
         // check for new client
         EthernetClient new_client = server_.accept();
@@ -97,8 +96,21 @@ struct EthernetWrapper
       {
         return false;
       }
+   
+      EthernetWrapperMsg header_packet;
 
-      if (client_.write(packet.data,packet.length) < packet.length) {return false;}
+      header_packet.data[0] = 0xAA;
+      header_packet.data[1] = 0x55;
+
+      memcpy(header_packet.data + 2, packet.data, packet.length);
+
+      header_packet.length = packet.length + 2;
+
+      size_t sent = client_.write(header_packet.data, header_packet.length);
+      if (sent != packet.length) {
+        return false; // or buffer for retry
+      }
+      
       return true;
     }
 };

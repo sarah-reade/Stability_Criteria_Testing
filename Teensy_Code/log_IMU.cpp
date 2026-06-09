@@ -123,14 +123,16 @@ bool TCPClient::receivePacket(std::vector<uint8_t>& packet, size_t size) {
         return false;
     }
 
-    if (socket_.available() < size) {
-        return false;
-    }
+    // if (socket_.available() < size) {
+    //     return false;
+    // }
 
     try {
         // Resize the packet buffer to accommodate the incoming data.
-        packet.resize(size);
-        boost::asio::read(socket_, boost::asio::buffer(packet, size));
+        uint8_t len;
+        boost::asio::read(socket_, boost::asio::buffer(&len, 1));
+        packet.resize(len);
+        boost::asio::read(socket_, boost::asio::buffer(packet, len));
 #ifdef DEBUG_TCP_CLIENT
         std::cout << "Packet received.\n";
 #endif
@@ -200,7 +202,7 @@ std::string generate_filename(const std::string& folder) {
 
 // Write CSV header
 void write_csv_header(std::ofstream& file) {
-    file << "Date,Time_ms,LinX,LinY,LinZ,GyrX,GyrY,GyrZ,LinAcc,GyrAcc" << std::endl;
+    file << "Date,Time_ms,SensorID,LinX,LinY,LinZ,GyrX,GyrY,GyrZ,LinAcc,GyrAcc" << std::endl;
 }
 
 // Write IMU reading to CSV
@@ -223,6 +225,7 @@ void write_imu_to_csv(std::ofstream& file, const IMUReading& reading) {
 
     // Write IMU data with 6 decimal places
     file << std::fixed << std::setprecision(6)
+         << static_cast<int>(reading.sensorID) << ","
          << reading.linX << ","
          << reading.linY << ","
          << reading.linZ << ","
@@ -276,28 +279,39 @@ int main(int argc, char* argv[]) {
             }
             
         }
-
+        
         // Get Ethernet Data
         if (client.receivePacket(buffer, BUFFER_SIZE)) {
+            
+            size_t start = std::string::npos;
 
-            // Ensure we have enough data for IMU parsing
-            if (buffer.size() >= PAYLOAD_SIZE) {
-
-                IMUReading reading;
-                if (reading.parse(buffer.data(), buffer.size())) {
-
-                    // Save to CSV
-                    write_imu_to_csv(csv_file, reading);
-                    csv_file.flush();
-
-                    std::cout << "Sensor " << static_cast<int>(reading.sensorID)
-                              << " Lin(" << reading.linX << ", " << reading.linY << ", " << reading.linZ << ")"
-                              << " Gyro(" << reading.gyrX << ", " << reading.gyrY << ", " << reading.gyrZ << ")\n";
+            for (size_t i = 0; i + 1 < buffer.size(); i++) {
+                if (buffer[i] == 0xAA && buffer[i + 1] == 0x55) {
+                    start = i;
+                    break;
                 }
+            }
+
+            if (start == std::string::npos) {
+                continue; // no frame found
+            }
+
+            const uint8_t* payload = buffer.data() + start + 2;
+            size_t payload_size = buffer.size() - (start + 2);
+
+            IMUReading reading;
+            if (reading.parse(payload, payload_size)) {
+
+                write_imu_to_csv(csv_file, reading);
+                csv_file.flush();
+
+                std::cout << "Sensor " << static_cast<int>(reading.sensorID)
+                        << " Lin(" << reading.linX << ", " << reading.linY << ", " << reading.linZ << ")"
+                        << " Gyro(" << reading.gyrX << ", " << reading.gyrY << ", " << reading.gyrZ << ")\n";
             }
         }
 
-        std::this_thread::sleep_for(1ms); // Sleep briefly to avoid busy waiting
+        //std::this_thread::sleep_for(1ms); // Sleep briefly to avoid busy waiting
     }
 
     client.disconnect();

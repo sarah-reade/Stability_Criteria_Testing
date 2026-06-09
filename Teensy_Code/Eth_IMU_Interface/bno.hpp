@@ -11,54 +11,68 @@
 bool set_reports(BNO08x_Copy *bno)
 {
   
-  if (bno->enableReport(SH2_GYROSCOPE_CALIBRATED) == true)
+  if (!bno->enableReport(SH2_GYROSCOPE_CALIBRATED))
+  {
+#ifdef DEBUG_BNO
+    Serial.println("Could not enable gyroscope");
+#endif
+  }
+  else 
   {
 #ifdef DEBUG_BNO
     Serial.println(F("Gyroscope enabled"));
 #endif
   }
-#ifdef DEBUG_BNO
-  Serial.println("Could not enable gyroscope");
-#endif
 
-  if (bno->enableReport(SH2_LINEAR_ACCELERATION) == true)
+
+  if (!bno->enableReport(SH2_LINEAR_ACCELERATION))
+  {
+#ifdef DEBUG_BNO
+    Serial.println("Could not enable linear acceleration");
+#endif
+    return false;
+  }
+  else
   {
 #ifdef DEBUG_BNO
     Serial.println(F("Linear Acceleration enabled"));
 #endif
     return true;
   }
-#ifdef DEBUG_BNO
-  Serial.println("Could not enable linear acceleration");
-#endif
 
-  return false;
 }
 
 bool set_reports(BNO08x *bno)
 {
   
-  if (bno->enableReport(SH2_GYROSCOPE_CALIBRATED) == true)
+  if (!bno->enableReport(SH2_GYROSCOPE_CALIBRATED))
+  {
+#ifdef DEBUG_BNO
+    Serial.println("Could not enable gyroscope");
+#endif
+  }
+  else 
   {
 #ifdef DEBUG_BNO
     Serial.println(F("Gyroscope enabled"));
 #endif
   }
-#ifdef DEBUG_BNO
-  Serial.println("Could not enable gyroscope");
-#endif
 
-  if (bno->enableReport(SH2_LINEAR_ACCELERATION) == true)
+
+  if (!bno->enableReport(SH2_LINEAR_ACCELERATION))
+  {
+#ifdef DEBUG_BNO
+    Serial.println("Could not enable linear acceleration");
+#endif
+    return false;
+  }
+  else
   {
 #ifdef DEBUG_BNO
     Serial.println(F("Linear Acceleration enabled"));
 #endif
     return true;
   }
-#ifdef DEBUG_BNO
-  Serial.println("Could not enable linear acceleration");
-#endif
-  return false;
 }
 
 bool initialise_bno(BNO08x_Copy *bno, uint8_t address, TwoWire &wirePort, int8_t intpin, int8_t rstpin)
@@ -120,9 +134,9 @@ struct BnoData
   uint8_t linAcc,gyrAcc;
 
   // Define min/max for each value 
-  bool flag[];
+  bool flag[2] = {false, false};
 
-  BnoData (BNO08x *bno):  linX(0),
+  BnoData ():  linX(0),
                           linY(0),
                           linZ(0),
                           gyrX(0),
@@ -130,6 +144,9 @@ struct BnoData
                           gyrZ(0),
                           linAcc(0),
                           gyrAcc(0)
+  {}
+
+  void update(BNO08x *bno)
   {
     if (bno->wasReset()) {
 #ifdef DEBUG_BNO
@@ -176,14 +193,7 @@ struct BnoData
     return;
   }
 
-  BnoData (BNO08x_Copy *bno):  linX(0),
-                          linY(0),
-                          linZ(0),
-                          gyrX(0),
-                          gyrY(0),
-                          gyrZ(0),
-                          linAcc(0),
-                          gyrAcc(0)
+  void update(BNO08x_Copy *bno)
   {
     if (bno->wasReset()) {
 #ifdef DEBUG_BNO
@@ -254,19 +264,14 @@ struct BnoData
     flag[1] = false;
     
     // total payload size
-    constexpr size_t payloadSize =
-        sizeof(sensorID) +
-        6 * sizeof(float) +
-        2 * sizeof(uint8_t);
-
+    constexpr size_t payloadSize = 1 + 6*sizeof(float) + 2*sizeof(uint8_t);
 
 #ifdef DEBUG_BNO
     Serial.println("Obtained Reading");
 #endif  
     // IMPORTANT: ensure buffer is large enough externally
     // (no heap safety here)
-    uint8_t buffer[64]; 
-    msg.data = buffer;
+    if (!msg.data) return false;
     uint8_t* p = msg.data;
 
     // optional header
