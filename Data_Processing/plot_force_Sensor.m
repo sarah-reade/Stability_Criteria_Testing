@@ -3,7 +3,7 @@ function plot_force_Sensor()
 
 % Resolve data paths relative to this script so the function is portable.
 scriptDir = fileparts(mfilename('fullpath'));
-dataDir = fullfile(scriptDir, '..', '..', 'VirtualBox VMs', 'shared', 'Force_Sensor_Data');
+dataDir = fullfile(scriptDir, '..', 'Force_Sensor_Data');
 dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
 
 if ~isfile(dataRegPath)
@@ -19,7 +19,7 @@ catch ME
     return;
 end
 
-requiredCols = {'ID', 'Filename', 'Configuration', 'Angle from Gravity', 'EM Config'};
+requiredCols = {'ID', 'Force Sensor Filename', 'IMU Filename', 'Configuration', 'Angle from Gravity', 'EM Config'};
 missingCols = requiredCols(~ismember(requiredCols, dataReg.Properties.VariableNames));
 if ~isempty(missingCols)
     errordlg(sprintf('The following required columns are missing:\n\n%s', strjoin(missingCols, ', ')), 'Invalid Registration File');
@@ -27,7 +27,7 @@ if ~isempty(missingCols)
 end
 
 % Keep only rows that can be mapped to a dataset and have EM config present.
-validRows = ~ismissing(dataReg.ID) & ~ismissing(dataReg.Filename) & strlength(dataReg.Filename) > 0 & ~ismissing(dataReg.('EM Config')) & strlength(dataReg.('EM Config')) > 0;
+validRows = ~ismissing(dataReg.ID) & ~ismissing(dataReg.('Force Sensor Filename')) & strlength(dataReg.('Force Sensor Filename')) > 0 & ~ismissing(dataReg.('IMU Filename')) & strlength(dataReg.('IMU Filename')) > 0 & ~ismissing(dataReg.('EM Config')) & strlength(dataReg.('EM Config')) > 0;
 dataReg = dataReg(validRows, :);
 
 if height(dataReg) == 0
@@ -43,23 +43,31 @@ if isempty(selectedIdx)
 end
 
 selectedRecord = dataReg(selectedIdx, :);
-csvFilename = string(selectedRecord.Filename) + ".csv";
-csvPath = fullfile(dataDir, csvFilename);
+fscsvFilename = string(selectedRecord.('Force Sensor Filename')) + ".csv";
+fscsvPath = fullfile(dataDir, fscsvFilename);
+imucsvFilename = string(selectedRecord.('IMU Filename')) + ".csv";
+imucsvPath = fullfile(dataDir, imucsvFilename);
 
-if ~isfile(csvPath)
-    errordlg(sprintf('The selected CSV file does not exist:\n\n%s', csvFilename), 'Missing CSV File');
+if ~isfile(fscsvPath)
+    errordlg(sprintf('The selected CSV file does not exist:\n\n%s', fscsvFilename), 'Missing CSV File');
+    return;
+elseif ~isfile(imucsvPath)
+    errordlg(sprintf('The selected CSV file does not exist:\n\n%s', imucsvFilename), 'Missing CSV File');
     return;
 end
 
 try
     % Parse sample rate, sensor channels, and metadata from selected CSV.
-    [sampleRate, sensorData, csvMeta] = readSensorCsv(csvPath);
+    [sampleRate, sensorData, csvMeta] = readSensorCsv(fscsvPath);
 catch ME
     errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
     return;
 end
 
-time = (0:height(sensorData)-1)' / sampleRate;
+t = duration(string(sensorData.Time), ...
+    'InputFormat', 'hh:mm:ss.SSS');
+
+time = seconds(t);
 
 % Apply rolling-average smoothing and downsample to approximately 10 Hz.
 targetRate = 10; % desired display rate (Hz)
@@ -101,14 +109,22 @@ sampleRate = sampleRate / decFactor;
 
 force = [fx_ds, fy_ds, fz_ds];
 torque = [tx_ds, ty_ds, tz_ds];
-forceMag = vecnorm(force, 2, 2);
-torqueMag = vecnorm(torque, 2, 2);
 
 infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(sensorData));
 
 % Layout: info panel, force components, torque components, derivative panel.
-figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', csvFilename));
-tiledlayout(4, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
+tl = tiledlayout(fig, 5, 1, ...
+    'TileSpacing', 'compact', ...
+    'Padding', 'compact');
+
+imuRawData = readtable(imucsvPath, 'Delimiter', ',', 'TextType', 'string');
+imuData = plot_two_sensor_average(imuRawData, tl);
+motionTimepoints = find_slips_and_tips(imuData);
+
+wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
+    'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
+wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
 
 infoAx = nexttile;
 axis(infoAx, 'off');
@@ -129,6 +145,9 @@ xlabel(ax, 'Time (s)');
 ylabel(ax, 'Force (N)');
 title(ax, 'Force Components', 'Interpreter', 'none');
 legend(ax, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
+hold(ax, 'on');
+xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+set(xl, 'HandleVisibility', 'off');
 
 ax = nexttile;
 plot(ax, time, torque, 'LineWidth', 1.5);
@@ -137,32 +156,13 @@ xlabel(ax, 'Time (s)');
 ylabel(ax, 'Torque (Nm)');
 title(ax, 'Torque Components', 'Interpreter', 'none');
 legend(ax, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
+hold(ax, 'on');
+xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+set(xl, 'HandleVisibility', 'off');
 
-ax = nexttile;
-% Plot Something Useful
-tol = 1e-12;
-maskValid = forceMag > tol;
+sgtitle(sprintf('Sensor data: %s', fscsvFilename), 'Interpreter', 'none');
 
-% --- Estimate best-fit linear mapping A using global least squares ---
-A = force(maskValid, :) \ torque(maskValid, :);  % 3x3 mapping
 
-% --- Reconstruct predicted torque ---
-torquePred = force * A;
-
-% --- Residual magnitude (key signal) ---
-residual = vecnorm(torque - torquePred, 2, 2);
-
-% Normalize (optional but helps interpretability)
-residualNorm = residual ./ (forceMag + tol);
-
-plot(ax, time, residualNorm, 'LineWidth', 1.5, 'Color', [0.1 0.6 0.2]);
-grid(ax, 'on');
-xlabel(ax, 'Time (s)');
-ylabel(ax, 'Normalized Residual');
-title(ax, 'Force-Torque Consistency Residual (Slip Indicator)', 'Interpreter', 'none');
-legend(ax, {'Residual'}, 'Location', 'best');
-
-sgtitle(sprintf('Sensor data: %s', csvFilename), 'Interpreter', 'none');
 end
 
 function displayItems = buildDisplayItems(dataReg)
@@ -187,11 +187,14 @@ selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', 'Position', [5
 selectionFig.UserData = [];
 selectionFig.CloseRequestFcn = @cancelSelection;
 
-uilabel(selectionFig, 'Position', [20 110 200 22], 'Text', 'Select Dataset');
+uilabel(selectionFig, ...
+    'Position', [20 140 200 22], ...
+    'Text', 'Select Dataset');
 
 dropdown = uidropdown( ...
     selectionFig, ...
-    'Position', [20 85 860 26], ...
+    'Position', [20 90 860 40], ...
+    'FontSize', 14, ...
     'Items', cellstr(displayItems), ...
     'ItemsData', 1:numel(displayItems), ...
     'Value', 1);
@@ -249,9 +252,9 @@ infoText = sprintf([ ...
     char(csvMeta.torqueCountsPerUnit));
 end
 
-function [sampleRate, data, meta] = readSensorCsv(csvPath)
+function [sampleRate, data, meta] = readSensorCsv(fscsvPath)
 % Read ATI-style CSV: metadata header followed by numeric data rows.
-fileText = fileread(csvPath);
+fileText = fileread(fscsvPath);
 fileLines = splitlines(string(fileText));
 
 sampleRate = 1;
@@ -274,7 +277,7 @@ meta.torqueCountsPerUnit = extractHeaderValue(fileLines, 'Counts per Unit Torque
 
 headerLineIndex = find(contains(fileLines, 'Status (hex)'), 1, 'first');
 if isempty(headerLineIndex)
-    error('Could not locate the data header in %s.', csvPath);
+    error('Could not locate the data header in %s.', fscsvPath);
 end
 
 dataLines = fileLines(headerLineIndex + 1:end);
@@ -289,6 +292,7 @@ fz = zeros(0, 1);
 tx = zeros(0, 1);
 ty = zeros(0, 1);
 tz = zeros(0, 1);
+Time = strings(0, 1);
 
 for i = 1:numel(dataLines)
     % Data rows are comma-separated and may include trailing empty tokens.
@@ -308,10 +312,11 @@ for i = 1:numel(dataLines)
     tx(end + 1, 1) = str2double(parts(7)); %#ok<AGROW>
     ty(end + 1, 1) = str2double(parts(8)); %#ok<AGROW>
     tz(end + 1, 1) = str2double(parts(9)); %#ok<AGROW>
+    Time(end + 1, 1) = parts(10); %#ok<AGROW>
 end
 
-data = table(status, rdtSequence, ftSequence, fx, fy, fz, tx, ty, tz, ...
-    'VariableNames', {'Status', 'RDTSequence', 'FTSequence', 'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'});
+data = table(status, rdtSequence, ftSequence, fx, fy, fz, tx, ty, tz, Time, ...
+    'VariableNames', {'Status', 'RDTSequence', 'FTSequence', 'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
 end
 
 function valueText = extractHeaderValue(fileLines, prefixText)
@@ -322,4 +327,290 @@ if isempty(lineIndex)
 else
     valueText = strtrim(extractAfter(fileLines(lineIndex), prefixText));
 end
+end
+
+function [imuData] = plot_two_sensor_average(rawData, tl)
+%PLOT_TWO_SENSOR_AVERAGE Align two sensors by timestamp and average signals
+
+% If input is not provided, you can paste data into a table externally
+% rawData must have columns:
+% Time_ms, SensorID, LinX, LinY, LinZ, GyrX, GyrY, GyrZ
+
+if ischar(rawData) || isstring(rawData)
+    rawData = readtable(rawData, 'Delimiter', ',');
+end
+
+% --- Convert timestamp string -> duration in seconds ---
+t = duration(string(rawData.Time_ms), 'InputFormat', 'hh:mm:ss.SSS');
+tSec = seconds(t);
+
+rawData.TimeSec = round(tSec, 3); % 1 ms alignment
+
+% --- Split sensors ---
+s1 = rawData(rawData.SensorID == 1, :);
+s2 = rawData(rawData.SensorID == 2, :);
+
+% --- Aggregate each sensor by time (handles duplicates) ---
+s1 = groupsummary(s1, "TimeSec", "mean");
+s2 = groupsummary(s2, "TimeSec", "mean");
+
+% Rename grouped outputs for clarity
+s1.Properties.VariableNames(2:end) = strcat(s1.Properties.VariableNames(2:end), "_s1");
+s2.Properties.VariableNames(2:end) = strcat(s2.Properties.VariableNames(2:end), "_s2");
+
+% --- Align on union of timestamps ---
+T = outerjoin(s1, s2, "Keys", "TimeSec", "MergeKeys", true);
+
+% --- Average signals where both sensors exist ---
+linX = mean([T.mean_LinX_s1, T.mean_LinX_s2], 2, 'omitnan');
+linY = mean([T.mean_LinY_s1, T.mean_LinY_s2], 2, 'omitnan');
+linZ = mean([T.mean_LinZ_s1, T.mean_LinZ_s2], 2, 'omitnan');
+
+gyrX = mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan');
+gyrY = mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan');
+gyrZ = mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan');
+
+time = T.TimeSec;
+
+imuData = table(time, linX, linY, linZ, gyrX, gyrY, gyrZ, ...
+    'VariableNames', {'Time', 'linX', 'linY', 'linZ', 'gyrX', 'gyrY', 'gyrZ'});
+
+% --- Plot ---
+nexttile;
+plot(time, [linX linY linZ], 'LineWidth', 1.5);
+grid on;
+xlabel('Time (s)');
+ylabel('Linear Acceleration');
+title('Averaged Linear Acceleration (Sensor 1 & 2)');
+legend('LinX','LinY','LinZ', 'Location', 'best');
+
+nexttile;
+plot(time, [gyrX gyrY gyrZ], 'LineWidth', 1.5);
+grid on;
+xlabel('Time (s)');
+ylabel('Gyroscope');
+title('Averaged Gyroscope (Sensor 1 & 2)');
+legend('GyrX','GyrY','GyrZ', 'Location', 'best');
+
+end
+
+function [timestamps] = find_slips_and_tips(imuData)
+    %% User thresholds
+    linThreshold = 1.0;
+    gyrThreshold = 0.06;
+    refractoryPeriod = 1.0;   % seconds
+
+    %% Build binary mask
+
+    mask = table();
+    mask.Time = imuData.Time;
+
+    mask.LinX = abs(imuData.linX) > linThreshold;
+    mask.LinY = abs(imuData.linY) > linThreshold;
+    mask.LinZ = abs(imuData.linZ) > linThreshold;
+
+    mask.GyrX = abs(imuData.gyrX) > gyrThreshold;
+    mask.GyrY = abs(imuData.gyrY) > gyrThreshold;
+    mask.GyrZ = abs(imuData.gyrZ) > gyrThreshold;
+
+
+    %% Find start of motion
+    motion = any(mask{:,2:end}, 2);
+
+    keep = false(height(mask),1);
+
+    inMotion = false;
+    startMotionIndex = 0;
+    endMotionTime = -inf;
+
+    for k = 1:height(mask)
+
+        t = mask.Time(k);
+
+        %% ---------------------------
+        %% Enter motion
+        %% ---------------------------
+        if ~inMotion && motion(k)
+            inMotion = true;
+            startMotionIndex = k;
+            endMotionTime = -inf;
+            continue
+        end
+
+        %% ---------------------------
+        %% While in motion
+        %% ---------------------------
+        if inMotion
+
+            % still moving → reset stationary timer
+            if motion(k)
+                endMotionTime = -inf;
+                continue
+            end
+
+            % motion dropped → start stationary timer
+            if endMotionTime == -inf
+                endMotionTime = t;
+                continue
+            end
+
+            % check stationary duration
+            if (t - endMotionTime) >= refractoryPeriod
+
+                keep(startMotionIndex) = true;
+
+                % reset state
+                inMotion = false;
+                startMotionIndex = 0;
+                endMotionTime = -inf;
+            end
+        end
+    end
+
+    %% Capture case where motion ends at dataset end
+    if inMotion && startMotionIndex > 0
+        keep(startMotionIndex) = true;
+    end
+
+    %% Final output
+    timestamps = mask(keep,:);
+    
+
+
+    % %% ================= DEBUG VISUALISATION =================
+
+    % figure('Color','w','Name','IMU Event Mask Debug');
+
+    % tiledlayout(3,1,'TileSpacing','compact','Padding','compact');
+
+    % %% -------------------------------------------------------
+    % %% 1. Raw signals + thresholds
+    % %% -------------------------------------------------------
+    % nexttile;
+
+    % plot(imuData.Time, imuData.linX, 'b'); hold on;
+    % plot(imuData.Time, imuData.linY, 'b--');
+    % plot(imuData.Time, imuData.linZ, 'b:');
+
+    % plot(imuData.Time, imuData.gyrX, 'r');
+    % plot(imuData.Time, imuData.gyrY, 'r--');
+    % plot(imuData.Time, imuData.gyrZ, 'r:');
+
+    % yline(linThreshold,'b','LineWidth',1);
+    % yline(-linThreshold,'b','LineWidth',1);
+
+    % yline(gyrThreshold,'r','LineWidth',1);
+    % yline(-gyrThreshold,'r','LineWidth',1);
+
+    % grid on;
+    % title('Raw IMU Signals + Thresholds');
+    % xlabel('Time (s)');
+    % ylabel('Signal');
+
+    % legend({'LinX','LinY','LinZ','GyrX','GyrY','GyrZ'},'Location','bestoutside');
+
+    % %% -------------------------------------------------------
+    % %% 2. Binary mask evolution
+    % %% -------------------------------------------------------
+    % nexttile;
+
+    % maskMat = table2array(mask(:,2:end));
+
+    % imagesc(imuData.Time, 1:6, maskMat');
+    % colormap(gray);
+    % clim([0 1]);
+
+    % yticks(1:6);
+    % yticklabels({'LinX','LinY','LinZ','GyrX','GyrY','GyrZ'});
+
+    % xlabel('Time (s)');
+    % ylabel('Channel');
+    % title('Binary Threshold Mask (1 = exceeded)');
+
+    % %% -------------------------------------------------------
+    % %% 3. After refractory filtering
+    % %% -------------------------------------------------------
+    % nexttile;
+
+    % hold on;
+
+    % % show all detected events lightly
+    % scatter(mask.Time, ones(height(mask),1), 10, [0.7 0.7 0.7], 'filled');
+
+    % % show accepted events strongly
+    % scatter(timestamps.Time, ones(height(timestamps),1), 40, 'r', 'filled');
+
+    % yticks([]);
+    % xlabel('Time (s)');
+    % title('Refractory Filtering Result (grey = rejected, red = kept)');
+    % grid on;
+
+end
+
+function wrenchTimestamps = find_wrench(stTimestamps, wrenchData)
+
+    n = height(stTimestamps);
+
+    wrenchTimestamps = table();
+
+    wrenchTimestamps.Time = stTimestamps.Time;
+
+    wrenchTimestamps.Fx = zeros(n,1);
+    wrenchTimestamps.Fy = zeros(n,1);
+    wrenchTimestamps.Fz = zeros(n,1);
+    wrenchTimestamps.Tx = zeros(n,1);
+    wrenchTimestamps.Ty = zeros(n,1);
+    wrenchTimestamps.Tz = zeros(n,1);
+
+    for k = 1:n
+
+        t = stTimestamps.Time(k);
+
+        % nearest time match
+        [~, idx] = min(abs(wrenchData.Time - t));
+
+        wrenchTimestamps.Fx(k) = wrenchData.Fx(idx);
+        wrenchTimestamps.Fy(k) = wrenchData.Fy(idx);
+        wrenchTimestamps.Fz(k) = wrenchData.Fz(idx);
+
+        wrenchTimestamps.Tx(k) = wrenchData.Tx(idx);
+        wrenchTimestamps.Ty(k) = wrenchData.Ty(idx);
+        wrenchTimestamps.Tz(k) = wrenchData.Tz(idx);
+
+    end
+
+    % figure('Color','w');
+
+    % tiledlayout(2,1,'TileSpacing','compact','Padding','compact');
+
+    % %% --- Forces ---
+    % nexttile;
+    % hold on;
+
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Fx, 25, 'filled');
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Fy, 25, 'filled');
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Fz, 25, 'filled');
+
+    % grid on;
+    % xlabel('Time (s)');
+    % ylabel('Force (N)');
+    % title('Force at Motion Events');
+
+    % legend({'Fx','Fy','Fz'}, 'Location','best');
+
+    % %% --- Torques ---
+    % nexttile;
+    % hold on;
+
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Tx, 25, 'filled');
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Ty, 25, 'filled');
+    % scatter(wrenchTimestamps.Time, wrenchTimestamps.Tz, 25, 'filled');
+
+    % grid on;
+    % xlabel('Time (s)');
+    % ylabel('Torque (Nm)');
+    % title('Torque at Motion Events');
+
+    % legend({'Tx','Ty','Tz'}, 'Location','best');
+
 end
