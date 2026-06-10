@@ -114,17 +114,9 @@ infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(sensor
 
 % Layout: info panel, force components, torque components, derivative panel.
 fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
-tl = tiledlayout(fig, 5, 1, ...
+tl = tiledlayout(fig, 6, 1, ...
     'TileSpacing', 'compact', ...
     'Padding', 'compact');
-
-imuRawData = readtable(imucsvPath, 'Delimiter', ',', 'TextType', 'string');
-imuData = plot_two_sensor_average(imuRawData, tl);
-motionTimepoints = find_slips_and_tips(imuData);
-
-wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
-    'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
-wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
 
 infoAx = nexttile;
 axis(infoAx, 'off');
@@ -138,6 +130,14 @@ text(infoAx, 0.01, 0.5, infoText, ...
     'EdgeColor', [0.55 0.65 0.8], ...
     'Margin', 10);
 
+imuRawData = readtable(imucsvPath, 'Delimiter', ',', 'TextType', 'string');
+imuData = plot_two_sensor_average(imuRawData, tl);
+motionTimepoints = find_slips_and_tips(imuData, 'mag');
+
+wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
+    'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
+wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
+
 ax = nexttile;
 plot(ax, time, force, 'LineWidth', 1.5);
 grid(ax, 'on');
@@ -146,8 +146,6 @@ ylabel(ax, 'Force (N)');
 title(ax, 'Force Components', 'Interpreter', 'none');
 legend(ax, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
 hold(ax, 'on');
-xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-set(xl, 'HandleVisibility', 'off');
 
 ax = nexttile;
 plot(ax, time, torque, 'LineWidth', 1.5);
@@ -157,12 +155,36 @@ ylabel(ax, 'Torque (Nm)');
 title(ax, 'Torque Components', 'Interpreter', 'none');
 legend(ax, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
 hold(ax, 'on');
-xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-set(xl, 'HandleVisibility', 'off');
 
-sgtitle(sprintf('Sensor data: %s', fscsvFilename), 'Interpreter', 'none');
+axs = findall(gcf, 'Type', 'axes');
 
+parameters = get_params(dataReg.('Configuration'),dataReg.('Angle from Gravity'),dataReg.('EM Config'));
 
+wrench = [force,torque];
+gamma = zeros(height(wrench),1);
+for k = 1:height(wrench)
+    gamma(k) = obtain_gamma(parameters,wrench(k,:)');
+end
+
+ax = nexttile;
+plot(ax, time, gamma, 'LineWidth', 1.5);
+grid(ax, 'on');
+xlabel(ax, 'Time (s)');
+ylabel(ax, 'Gamma');
+title(ax, 'Gamma', 'Interpreter', 'none');
+hold(ax, 'on');
+
+for k = 1:numel(axs)
+    if axs(k) == infoAx
+        continue
+    end
+    xl = xline(axs(k), wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+    xe = xline(axs(k), motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+    set(xl, 'HandleVisibility', 'off');
+    set(xe, 'HandleVisibility', 'off');
+end
+
+sgtitle(sprintf('Sensor data: %s | %s', fscsvFilename, imucsvFilename), 'Interpreter', 'none');
 end
 
 function displayItems = buildDisplayItems(dataReg)
@@ -394,30 +416,53 @@ legend('GyrX','GyrY','GyrZ', 'Location', 'best');
 
 end
 
-function [timestamps] = find_slips_and_tips(imuData)
-    %% User thresholds
-    linThreshold = 1.0;
-    gyrThreshold = 0.06;
-    refractoryPeriod = 1.0;   % seconds
+function [timestamps] = find_slips_and_tips(imuData,method)
 
     %% Build binary mask
 
     mask = table();
-    mask.Time = imuData.Time;
 
-    mask.LinX = abs(imuData.linX) > linThreshold;
-    mask.LinY = abs(imuData.linY) > linThreshold;
-    mask.LinZ = abs(imuData.linZ) > linThreshold;
+    if strcmp(method,'ind')
+        %% User thresholds
+        linThreshold = 1.0;
+        gyrThreshold = 0.06;
+        refractoryPeriod = 0.8;   % seconds
 
-    mask.GyrX = abs(imuData.gyrX) > gyrThreshold;
-    mask.GyrY = abs(imuData.gyrY) > gyrThreshold;
-    mask.GyrZ = abs(imuData.gyrZ) > gyrThreshold;
+        mask.Time = imuData.Time;
 
+        mask.LinX = abs(imuData.linX) > linThreshold;
+        mask.LinY = abs(imuData.linY) > linThreshold;
+        mask.LinZ = abs(imuData.linZ) > linThreshold;
+
+        mask.GyrX = abs(imuData.gyrX) > gyrThreshold;
+        mask.GyrY = abs(imuData.gyrY) > gyrThreshold;
+        mask.GyrZ = abs(imuData.gyrZ) > gyrThreshold;
+
+    elseif strcmp(method,'mag')
+
+        %% User thresholds
+        linThreshold = 0.9;
+        gyrThreshold = 0.08;
+        refractoryPeriod = 0.8;   % seconds
+
+        mask.Time = imuData.Time;
+        mask.Lin = imuData.linX.^2+imuData.linY.^2+imuData.linZ.^2 > linThreshold^2;
+        mask.Gyr = imuData.gyrX.^2+imuData.gyrY.^2+imuData.gyrZ.^2 > gyrThreshold^2;
+
+        mask.LinX = mask.Lin;
+        mask.LinY = mask.Lin;
+        mask.LinZ = mask.Lin;
+
+        mask.GyrX = mask.Gyr;
+        mask.GyrY = mask.Gyr;
+        mask.GyrZ = mask.Gyr;
+    end
 
     %% Find start of motion
     motion = any(mask{:,2:end}, 2);
 
     keep = false(height(mask),1);
+    endTimeLog = -inf(height(mask),1);
 
     inMotion = false;
     startMotionIndex = 0;
@@ -459,6 +504,8 @@ function [timestamps] = find_slips_and_tips(imuData)
 
                 keep(startMotionIndex) = true;
 
+                endTimeLog(startMotionIndex) = endMotionTime;
+
                 % reset state
                 inMotion = false;
                 startMotionIndex = 0;
@@ -470,10 +517,16 @@ function [timestamps] = find_slips_and_tips(imuData)
     %% Capture case where motion ends at dataset end
     if inMotion && startMotionIndex > 0
         keep(startMotionIndex) = true;
+        endTimeLog(startMotionIndex) = endMotionTime;
     end
 
     %% Final output
     timestamps = mask(keep,:);
+    timestamps.EndTime = endTimeLog(keep);
+
+    %% Adjust for 0.01ms delay
+    timestamps.Time = timestamps.Time - 0.01;
+
     
 
 
@@ -487,14 +540,17 @@ function [timestamps] = find_slips_and_tips(imuData)
     % %% 1. Raw signals + thresholds
     % %% -------------------------------------------------------
     % nexttile;
+    % linMag = sqrt(imuData.linX.^2+imuData.linY.^2+imuData.linZ.^2);
+    % gyrMag = sqrt(imuData.gyrX.^2+imuData.gyrY.^2+imuData.gyrZ.^2);
+    % plot(imuData.Time, linMag, 'b'); hold on;
+    % plot(imuData.Time, gyrMag, 'r'); hold on;
+    % % plot(imuData.Time, imuData.linX, 'b'); hold on;
+    % % plot(imuData.Time, imuData.linY, 'b--');
+    % % plot(imuData.Time, imuData.linZ, 'b:');
 
-    % plot(imuData.Time, imuData.linX, 'b'); hold on;
-    % plot(imuData.Time, imuData.linY, 'b--');
-    % plot(imuData.Time, imuData.linZ, 'b:');
-
-    % plot(imuData.Time, imuData.gyrX, 'r');
-    % plot(imuData.Time, imuData.gyrY, 'r--');
-    % plot(imuData.Time, imuData.gyrZ, 'r:');
+    % % plot(imuData.Time, imuData.gyrX, 'r');
+    % % plot(imuData.Time, imuData.gyrY, 'r--');
+    % % plot(imuData.Time, imuData.gyrZ, 'r:');
 
     % yline(linThreshold,'b','LineWidth',1);
     % yline(-linThreshold,'b','LineWidth',1);
@@ -507,7 +563,8 @@ function [timestamps] = find_slips_and_tips(imuData)
     % xlabel('Time (s)');
     % ylabel('Signal');
 
-    % legend({'LinX','LinY','LinZ','GyrX','GyrY','GyrZ'},'Location','bestoutside');
+    % %legend({'LinX','LinY','LinZ','GyrX','GyrY','GyrZ'},'Location','bestoutside');
+    % legend({'LinMag','GyrMag'},'Location','bestoutside');
 
     % %% -------------------------------------------------------
     % %% 2. Binary mask evolution
@@ -612,5 +669,344 @@ function wrenchTimestamps = find_wrench(stTimestamps, wrenchData)
     % title('Torque at Motion Events');
 
     % legend({'Tx','Ty','Tz'}, 'Location','best');
+
+end
+
+function out = parseOnOff(s)
+    parts = split(string(s), "-");
+    out = double(parts == "on");
+end
+
+function GMatrix = getGMatrix(trans,rotMat)
+    % Ensure correct shapes
+    trans = trans(:);
+
+    % Skew-symmetric matrix of translation vector
+    p_hat = [    0      -trans(3)  trans(2);
+            trans(3)    0       -trans(1);
+            -trans(2)  trans(1)     0     ];
+
+    % Wrench transformation matrix (force-moment transformation)
+    GMatrix = [rotMat, zeros(3,3);
+            p_hat * rotMat, rotMat];
+end
+
+function gamma = obtain_gamma(parameters,wrench)
+    
+    %% Add Gravity 
+    sensor_wrench = wrench + parameters.gravity;
+
+    %% Solve optimisation problem
+    gamma = solveSOCP(parameters,sensor_wrench);
+
+
+end
+
+function parameters = get_params(config,angle,emconfig)
+    %% Set Contact Variables
+    % these are different for each configuration and angle to gravity, but include:
+    % g The gravity vector relative to the force sensor
+    % Gg Transformation matrix from gravity wrench to sensor wrench
+    % m mass of the system
+    % Fd,i Nominal magnetic adhesion force.
+    % si ∈ [0, 1] Surface magnetic permeability coefficient.
+    % ci ∈ [0, 1] Contact confidence coefficient.
+    % Gi Transformation matrix from contact wrench to sensor wrench.
+    % µi Coefficient of friction.
+    % ri Contact support radius.
+    % reff,i Effective frictional-torque radius.
+    
+    persistent CACHE
+
+    key = sprintf('%s_%s_%s', config, angle, string(emconfig));
+
+    if isempty(CACHE)
+        CACHE = containers.Map;
+    end
+
+    if isKey(CACHE, key)
+        parameters = CACHE(key);
+        return;
+    end
+
+    parameters.mu = 0.8;
+    parameters.r = 77;
+    parameters.reff = 77/2;
+
+    m_em = 0.4;
+    m_pm = 0.002*19;
+    m_force = 0.09;
+    m_EM_plate = 0.275;
+    m_EM_Interface_Single = 0.275;
+    m_EM_Interface_Long = 0.166;
+    m_Flat_Plate = 0.197;
+    m_RA_Plate = 0.272;
+
+
+
+    if any(strcmp(config,'flat'),strcmp(config,'RA'))
+        % Contact confidence
+        parameters.c = [0.8,0.8]; % Account for lack of coverage
+
+        % Calculate Adhesion Force
+        mask = parseOnOff(emconfig);
+        parameters.Fd = [450,450] + mask*[1400,1400];
+
+    end
+    
+    if strcmp(config,'single')
+        % Contact confidence
+        parameters.c = [0.8]; % Account for lack of coverage
+
+        % Calculate Adhesion Force
+        mask = double(emconfig == "on");
+        parameters.Fd = [450] + mask*[1400];
+        
+        % Set surface magnetic permeability
+        if ~strcmp(angle,'0')
+            parameters.s = [1.0];
+        else
+            parameters.s = zeros(1,1);
+        end 
+
+        % Calculate G_i Wrench Transormation Matrix
+        parameters.G = cell(1,1);
+        trans = [0 0 70.533];
+        rot = eye(3);
+        parameters.G{1} = getGMatrix(trans,rot);
+
+        % Calculate mass
+        parameters.m = m_EM_Interface_Single + m_EM_plate + m_force + m_pm + m_em;
+
+        % CoM to Sensor Wrench Transormation Matrix
+        trans = [0.0 0.0 47.0220];
+        rot = eye(3);
+        Gg = getGMatrix(trans,rot);
+        
+    
+    elseif strcmp(config,'flat')
+        % Set surface magnetic permeability
+        if ~strcmp(angle,'0')
+            parameters.s = [1.0,1.0];
+        else
+            parameters.s = zeros(2,1);
+        end 
+
+        % Calculate G_i Wrench Transormation Matrix
+        parameters.G = cell(2,1);
+
+        trans = [77.1820; -63.8840; 69.0410];
+        rot = [0.6428  -0.7660  0.0000;
+            0.7660   0.6428  0.0000;
+            0.0000   0.0000  1.0000];
+
+        parameters.G{1} = getGMatrix(trans, rot);
+
+        trans = [-271.0299; 220.6576; 68.5300];
+        rot = [0.6428  -0.7660  0.0000;
+            0.7660   0.6428  0.0000;
+            0.0000   0.0000  1.0000];
+
+        parameters.G{2} = getGMatrix(trans, rot);
+
+        % Calculate mass
+        parameters.m = m_EM_Interface_Long*2 + m_Flat_Plate + m_EM_plate + m_force + m_pm + m_em;
+
+        % CoM to Sensor Wrench Transormation Matrix
+        trans = [-97.8237 82.0855 68.5300];
+        rot = eye(3);
+        Gg = getGMatrix(trans,rot);
+
+    elseif strcmp(config,'RA')
+        % Set surface magnetic permeability
+        if ~strcmp(angle,'0')
+            parameters.s = [1.0,1.0];
+        else
+            parameters.s = [0.0,1.0];
+        end 
+        
+        % Calculate G_i Wrench Transormation Matrix
+        parameters.G = cell(2,1);
+
+        trans = [77.1820; -63.8840; 69.0410];
+        rot = [0.6428  -0.7660  0.0000;
+            0.7660   0.6428  0.0000;
+            0.0000   0.0000  1.0000];
+
+        parameters.G{1} = getGMatrix(trans, rot);
+
+        trans = [-165.2400; 138.6500; -246.4600];
+        rot = [0.6428  0.0000  -0.7660;
+            0.7660  0.0000  0.6428;
+            0.0000  -1.0000  0.0000];
+
+        parameters.G{2} = getGMatrix(trans, rot);
+
+        % Calculate mass
+        parameters.m = m_EM_Interface_Long*2 + m_RA_Plate + m_EM_plate + m_force + m_pm + m_em;
+
+        % CoM to Sensor Wrench Transormation Matrix
+        trans = [-44.0290 37.3830 -88.7095];
+        rot = eye(3);
+        Gg = getGMatrix(trans,rot);
+    end
+    
+    g_base = [0.0,0.0,-9.81];
+
+    if strcmp(angle,'0')
+        g = v_rot(g_base,pi,x);
+    elseif strcmp(angle,'90')
+        g = v_rot(g_base,pi/2,x);
+        g = v_rot(g,deg2rad(-40),z); % rotate to match sensor frame in x and y
+    elseif strcmp(angle,'90V')
+        g = v_rot(g_base,pi/2,x);
+        g = v_rot(g,deg2rad(-130),z); % rotate to match sensor frame in x and y
+    else
+        g = g_base;
+    end 
+    
+    g = [g,0,0,0];
+
+    parameters.gravity = Gg*g.';
+    
+end
+
+function gamma_opt = solveSOCP(parameters,wrench)
+
+    nc = length(parameters.G);
+
+    mu   = parameters.mu;
+    r    = parameters.r;
+    reff = parameters.reff;
+
+    cvx_begin quiet
+
+        variables gamma
+
+        variables F(6,nc)
+        variables Fa(nc)
+
+        variables ux(nc)
+        variables uy(nc)
+
+        maximize(gamma)
+
+        %% --------------------------
+        % Wrench equilibrium
+        %% --------------------------
+
+        W = zeros(6,1);
+
+        for i = 1:nc
+            W = W + parameters.c(i) * parameters.G{i} * F(:,i);
+        end
+
+        W == wrench;
+
+        %% --------------------------
+        % Contact constraints
+        %% --------------------------
+
+        for i = 1:nc
+
+            N = F(3,i) + Fa(i);
+
+            %-------------------------
+            % Normal-force margin
+            %-------------------------
+            N >= gamma;
+
+            %-------------------------
+            % Friction cone
+            %-------------------------
+            norm([
+                F(1,i);
+                F(2,i);
+                F(6,i)/reff
+            ]) <= mu*N - gamma;
+
+            % RHS of SOC must be nonnegative
+            mu*N - gamma >= 0;
+
+            %-------------------------
+            % Tipping constraints
+            %-------------------------
+            ux(i) >= F(4,i);
+            ux(i) >= -F(4,i);
+
+            uy(i) >= F(5,i);
+            uy(i) >= -F(5,i);
+
+            N - (2/r)*ux(i) >= gamma;
+            N - (2/r)*uy(i) >= gamma;
+
+            %% Adhesion approximation
+
+            adhesionConstraints( ...
+                Fa(i), ...
+                F(3,i), ...
+                parameters.Fd(i), ...
+                parameters.s(i) );
+
+        end
+
+    cvx_end
+
+    gamma_opt = gamma;
+
+end
+
+function adhesionConstraints(Fa,Fz,Fd,s)
+
+    x = s*Fd + Fz;
+
+    Fa >= 0;
+
+    Fa <= 0.69*(s*Fd);
+
+    Fa <= 0.93*(s*Fd) - 31.77;
+
+    Fa <= 1.66*(s*Fd) - 320.79;
+
+    Fa <= s*Fd;
+
+end
+
+function v_rot = rotateVector(vector, angle, axis)
+%ROTATEVECTOR Rotate a 3D vector about principal axes (x, y, z)
+%
+% Inputs:
+%   vector - 3x1 or 1x3 vector
+%   angle  - rotation angle in radians
+%   axis   - 'x', 'y', or 'z' (case-insensitive)
+%
+% Output:
+%   v_rot  - rotated 3x1 vector
+
+v = vector(:);
+
+axis = lower(axis);
+
+switch axis
+    case 'x'
+        R = [1 0 0;
+             0 cos(angle) -sin(angle);
+             0 sin(angle)  cos(angle)];
+
+    case 'y'
+        R = [ cos(angle) 0 sin(angle);
+              0          1 0;
+             -sin(angle) 0 cos(angle)];
+
+    case 'z'
+        R = [cos(angle) -sin(angle) 0;
+             sin(angle)  cos(angle) 0;
+             0           0          1];
+
+    otherwise
+        error('Axis must be ''x'', ''y'', or ''z''.');
+end
+
+v_rot = R * v;
 
 end
