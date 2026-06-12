@@ -162,8 +162,10 @@ parameters = get_params(selectedRecord.('Configuration'),selectedRecord.('Angle 
 
 wrench = [force,torque];
 gamma_cnstr = zeros(height(wrench),1);
+nc = numel(parameters.c);
+variables = zeros(height(wrench),nc*6 + 1);
 for k = 1:height(wrench)
-    gamma_cnstr(k) = obtain_gamma_cnstr(parameters,wrench(k,:)');
+    [variables(k,:),gamma_cnstr(k)] = obtain_gamma_cnstr(parameters,wrench(k,:)');
 end
 
 ax = nexttile;
@@ -173,6 +175,10 @@ xlabel(ax, 'Time (s)');
 ylabel(ax, 'gamma_cnstr');
 title(ax, 'gamma_cnstr', 'Interpreter', 'none');
 hold(ax, 'on');
+xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+set(xl, 'HandleVisibility', 'off');
+set(xe, 'HandleVisibility', 'off');
 
 for k = 1:numel(axs)
     if axs(k) == infoAx
@@ -867,230 +873,177 @@ function parameters = get_params(config,angle,emconfig)
     g = [g,0,0,0];
 
     parameters.gravity = Gg*g.';
+
+    print_parameters(parameters);
     
 end
 
-function gamma_cnstr = obtain_gamma_cnstr(parameters,wrench)
+function print_parameters(p)
+%% PRINT_PARAMETERS Pretty-print parameters struct
+
+    fprintf('\n================ PARAMETERS ================\n');
+
+    % --- Scalars ---
+    print_field('mu', p.mu);
+    print_field('r', p.r);
+    print_field('reff', p.reff);
+    print_field('m', p.m);
+
+    % --- Vectors ---
+    if isfield(p, 'c')
+        fprintf('c:\n');
+        disp(p.c);
+    end
+
+    if isfield(p, 'Fd')
+        fprintf('Fd:\n');
+        disp(p.Fd);
+    end
+
+    if isfield(p, 's')
+        fprintf('s:\n');
+        disp(p.s);
+    end
+
+    % --- Gravity ---
+    if isfield(p, 'gravity')
+        fprintf('gravity (sensor frame wrench):\n');
+        disp(p.gravity);
+    end
+
+    % --- Transformation matrices ---
+    if isfield(p, 'G')
+        fprintf('G (contact wrench transforms):\n');
+        for i = 1:numel(p.G)
+            fprintf('  G{%d}:\n', i);
+            disp(p.G{i});
+        end
+    end
+
+    fprintf('===========================================\n\n');
+
+end
+
+%% Helper for scalar printing
+function print_field(name, value)
+    if isnumeric(value)
+        if isscalar(value)
+            fprintf('%s: %.6f\n', name, value);
+        else
+            fprintf('%s:\n', name);
+            disp(value);
+        end
+    else
+        fprintf('%s:\n', name);
+        disp(value);
+    end
+end
+
+function [x,beta] = obtain_gamma_cnstr(parameters,wrench)
     
     %% Add Gravity 
-    sensor_wrench = wrench + parameters.gravity;
+    %%sensor_wrench = wrench + parameters.gravity;
+    sensor_wrench = wrench;
 
     %% Solve optimisation problem
-    gamma_cnstr = solveSOCP(parameters,sensor_wrench);
+    [x,beta] = solveSOCP(parameters,sensor_wrench);
 
 
 end
 
 
-function gamma_cnst = solveSOCP(parameters, wrench)
-
-    % ----------------------------
-    % Problem dimensions
-    % ----------------------------
-    nc = numel(parameters.G);
-    nF = 6;
-
+function [x,beta] = solveSOCP(parameters, wrench)
+    % SOLVESOCP
+    % Robust contact-wrench SOCP using coneprog
+    
+    % -----------------------------
+    % Extract parameters
+    % -----------------------------
+    nc   = numel(parameters.c);     % number of contacts
     mu   = parameters.mu;
     r    = parameters.r;
     reff = parameters.reff;
+    c    = parameters.c;
+    G    = parameters.G;
+    Fa   = parameters.s.*parameters.Fd;
+    
+    % -----------------------------
+    % Setup x and objective function
+    % -----------------------------
+    f = zeros(6*nc+1,1);
+    f(end) = -1;
+    
+    % -----------------------------
+    % Linear equality
+    % -----------------------------
+    Aeq = zeros(6, 6*nc + 1);
 
-    c = parameters.c(:);
-    Fd = parameters.Fd(:);
-    s  = parameters.s(:);
-
-    % ----------------------------
-    % Outer SCA loop (adhesion)
-    % ----------------------------
-    Fa = s .* Fd;
-
-    maxIter = 8;
-    tol = 1e-3;
-    gamma_prev = -inf;
-
-    for iter = 1:maxIter
-
-        nx = nc*nF + nc + 1;
-
-        idxF  = @(i) (i-1)*nF + (1:nF);
-        idxFa = @(i) nc*nF + i;
-        idxG  = nx;
-
-        % ----------------------------
-        % Objective: maximize gamma
-        % ----------------------------
-        prob.c = sparse(nx,1);
-        prob.c(idxG) = -1;
-
-        % ----------------------------
-        % Equality: wrench balance
-        % ----------------------------
-        Aeq = [];
-        beq = wrench(:);
-
-        for i = 1:nc
-            Gi = parameters.G{i};
-            Ai = c(i) * Gi;
-
-            row = zeros(6, nx);
-            row(:, idxF(i)) = Ai;
-
-            Aeq = [Aeq; row];
-        end
-
-        prob.a   = sparse(Aeq);
-        prob.blc = beq;
-        prob.buc = beq;
-
-        % ----------------------------
-        % Bounds
-        % ----------------------------
-        prob.blx = -inf(nx,1);
-        prob.bux = inf(nx,1);
-        prob.blx(idxG) = 0;
-
-        % ============================================================
-        % SOCP (MOSEK ACC FORMULATION)
-        % ============================================================
-        accs = [];
-        accidx = 0;
-
-        for i = 1:nc
-
-            Fi = idxF(i);
-            Fa_i = idxFa(i);
-
-            Fx = Fi(1);
-            Fy = Fi(2);
-            Fz = Fi(3);
-            tx = Fi(4);
-            ty = Fi(5);
-            tz = Fi(6);
-
-            % ----------------------------
-            % 1) Friction cone
-            % ||[Fx Fy tz/reff]|| <= mu*(Fz + Fa_i)
-            % ----------------------------
-            accidx = accidx + 1;
-
-            F = sparse(4, nx);
-
-            F(1,Fx) = 1;
-            F(2,Fy) = 1;
-            F(3,tz) = 1/reff;
-
-            F(4,Fz) = -mu;
-            F(4,Fa_i) = -mu;
-
-            accs(accidx).sub = F;
-            accs(accidx).dom = 'MSK_DOMAIN_QUAD';
-
-            % ----------------------------
-            % 2) Tipping x
-            % |tx| <= 0.5*r*(Fz + Fa_i)
-            % ----------------------------
-            accidx = accidx + 1;
-
-            F = sparse(3, nx);
-
-            F(1,tx) = 1;
-            F(2,Fz) = -0.5*r;
-            F(2,Fa_i) = -0.5*r;
-
-            F(3,tx) = -1;
-            F(3,Fz) = -0.5*r;
-            F(3,Fa_i) = -0.5*r;
-
-            accs(accidx).sub = F;
-            accs(accidx).dom = 'MSK_DOMAIN_QUAD';
-
-            % ----------------------------
-            % 3) Tipping y
-            % |ty| <= 0.5*r*(Fz + Fa_i)
-            % ----------------------------
-            accidx = accidx + 1;
-
-            F = sparse(3, nx);
-
-            F(1,ty) = 1;
-            F(2,Fz) = -0.5*r;
-            F(2,Fa_i) = -0.5*r;
-
-            F(3,ty) = -1;
-            F(3,Fz) = -0.5*r;
-            F(3,Fa_i) = -0.5*r;
-
-            accs(accidx).sub = F;
-            accs(accidx).dom = 'MSK_DOMAIN_QUAD';
-
-        end
-
-        prob.accs = accs;
-
-        % ----------------------------
-        % Solve MOSEK
-        % ----------------------------
-        param.MSK_IPAR_LOG = 0;
-
-        [r,res] = mosekopt('minimize echo(0)', prob, param);
-
-        if r ~= 0
-            error('MOSEK failed (code %d)', r);
-        end
-
-        if ~isfield(res.sol,'itr') || isempty(res.sol.itr.xx)
-            error('MOSEK returned empty solution (infeasible or ill-posed)');
-        end
-
-        x = res.sol.itr.xx;
-
-        % ----------------------------
-        % Extract solution
-        % ----------------------------
-        Fz_all = zeros(nc,1);
-
-        for i = 1:nc
-            Fi = idxF(i);
-            Fz_all(i) = x(Fi(3));
-        end
-
-        gamma = x(idxG);
-
-        % ----------------------------
-        % Adhesion update (SCA)
-        % ----------------------------
-        Fa_new = zeros(nc,1);
-
-        for i = 1:nc
-            z = s(i)*Fd(i) + Fz_all(i);
-
-            if z < 241.49
-                Fa_new(i) = 0.69 * (s(i)*Fd(i));
-
-            elseif z < 393.46
-                Fa_new(i) = 0.93 * (s(i)*Fd(i)) - 31.77;
-
-            elseif z < 484.20
-                Fa_new(i) = 1.66 * (s(i)*Fd(i)) - 320.79;
-
-            else
-                Fa_new(i) = s(i)*Fd(i);
-            end
-        end
-
-        % ----------------------------
-        % convergence check
-        % ----------------------------
-        if abs(gamma - gamma_prev) < tol
-            break;
-        end
-
-        gamma_prev = gamma;
-        Fa = Fa_new;
-
+    for i = 1:nc
+        cols = (6*(i-1)+1):(6*i);
+        Aeq(:, cols) = c(i) * G{i};
     end
 
-    gamma_cnst = gamma;
+    beq = wrench;
 
+    % -----------------------------
+    % Linear inequality
+    % -----------------------------
+
+    nrow = 4 * nc;
+    ncol = 6 * nc + 1;
+    
+    A = zeros(nrow, ncol);
+    
+    b = [];
+
+    for i = 1:nc
+        cols = (6*(i-1)+1):(6*i);
+        rows = (4*(i-1)+1):(4*i);
+    
+        % z component (always 1)
+        A(rows, cols(3)) = 1;
+    
+        % angular x/y contributions
+        A(rows(1:2), cols(4)) = [ 2/r; -2/r ];
+        A(rows(3:4), cols(5)) = [ 2/r; -2/r ];
+    
+        % last column = 1
+        A(rows, end) = 1;
+
+        b = [b; Fa(i) * ones(4,1)];
+    end
+
+    % -----------------------------
+    % SOC inequalities
+    % -----------------------------
+    for i = 1:nc
+        Asoc = zeros(3, ncol);
+
+        startCol = 7*(i-1) + 1;
+
+        Asoc(1, startCol)     = 1;
+        Asoc(2, startCol + 1) = 1;
+        Asoc(3, startCol + 5) = 1/reff;
+
+        bsoc = zeros(3,1);
+
+        dsoc = zeros(ncol, 1);
+        dsoc(startCol + 2,1) = mu;
+        dsoc(end,1) = -1;
+
+        gamma = mu*Fa(i);
+        
+        socConstraints(nc+1-i) = secondordercone(Asoc,bsoc,dsoc,gamma);
+    end
+
+
+
+    % -----------------------------
+    % Solve
+    % -----------------------------
+    lb = ones(1,6*nc+1)*-Inf;
+    ub = ones(1,6*nc+1)*Inf;
+    [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub);
 end
 
 function v_rot = rotateVector(vector, angle, axis)
