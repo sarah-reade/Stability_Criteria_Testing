@@ -97,18 +97,26 @@ end
 
 idx = 1:decFactor:height(sensorData);
 time = time(idx);
-fx_ds = fx_s(idx);
-fy_ds = fy_s(idx);
-fz_ds = fz_s(idx);
-tx_ds = tx_s(idx);
-ty_ds = ty_s(idx);
-tz_ds = tz_s(idx);
+fx_ds = (fx_s(idx))-fx_s(2);
+fy_ds = (fy_s(idx))-fy_s(2);
+fz_ds = -((fz_s(idx))-fz_s(2));
+tx_ds = tx_s(idx)-tx_s(2);
+ty_ds = ty_s(idx)-ty_s(2);
+tz_ds = -(tz_s(idx)-tz_s(2));
 
 % Effective sample rate after decimation (used for derivative scaling).
 sampleRate = sampleRate / decFactor;
 
 force = [fx_ds, fy_ds, fz_ds];
 torque = [tx_ds, ty_ds, tz_ds];
+
+% % Force normalization (remove initial offset)
+% force0 = force(1,:);              % [fx0 fy0 fz0]
+% force = force - force0;
+% 
+% % Torque normalization
+% torque0 = torque(1,:);            % [tx0 ty0 tz0]
+% torque = torque - torque0;
 
 infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(sensorData));
 
@@ -158,36 +166,48 @@ hold(ax, 'on');
 
 axs = findall(gcf, 'Type', 'axes');
 
-parameters = get_params(selectedRecord.('Configuration'),selectedRecord.('Angle from Gravity'),selectedRecord.('EM Config'));
+parameters = get_params(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'));
 
 wrench = [force,torque];
 gamma_cnstr = zeros(height(wrench),1);
 nc = numel(parameters.c);
 variables = zeros(height(wrench),nc*6 + 1);
+beta = zeros(height(wrench),1);
+all_beta = zeros(height(wrench),4,nc);
 for k = 1:height(wrench)
     [variables(k,:),gamma_cnstr(k)] = obtain_gamma_cnstr(parameters,wrench(k,:)');
+    [beta(k),all_beta(k,:,:)] = get_beta(variables(k,:),parameters);
 end
 
 ax = nexttile;
-plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
+hold(ax,"on");
 grid(ax, 'on');
-xlabel(ax, 'Time (s)');
-ylabel(ax, 'gamma_cnstr');
-title(ax, 'gamma_cnstr', 'Interpreter', 'none');
-hold(ax, 'on');
-xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-set(xl, 'HandleVisibility', 'off');
-set(xe, 'HandleVisibility', 'off');
 
-for k = 1:numel(axs)
-    if axs(k) == infoAx
-        continue
-    end
-    xl = xline(axs(k), wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-    xe = xline(axs(k), motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+% plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
+plot(ax, time, beta, 'LineWidth', 1.5);
+xlabel(ax, 'Time (s)');
+ylabel(ax, 'value');
+title(ax, 'gamma_cnstr', 'Interpreter', 'none');
+% legend(ax, {'gamma', 'beta'}, 'Location', 'best');
+
+if height(wrenchTimepoints.Time) > 0
+    
+    xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+    xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
     set(xl, 'HandleVisibility', 'off');
     set(xe, 'HandleVisibility', 'off');
+    
+    for k = 1:numel(axs)
+        if axs(k) == infoAx
+            continue
+        end
+        xl = xline(axs(k), wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+        xe = xline(axs(k), motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+        set(xl, 'HandleVisibility', 'off');
+        set(xe, 'HandleVisibility', 'off');
+    end
+    
+    plotOptimVariables(time, variables, nc, all_beta, wrenchTimepoints, motionTimepoints)
 end
 
 sgtitle(sprintf('Sensor data: %s | %s', fscsvFilename, imucsvFilename), 'Interpreter', 'none');
@@ -398,7 +418,8 @@ gyrX = mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan');
 gyrY = mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan');
 gyrZ = mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan');
 
-time = T.TimeSec;
+offset = 0.01;
+time = T.TimeSec - offset;
 
 imuData = table(time, linX, linY, linZ, gyrX, gyrY, gyrZ, ...
     'VariableNames', {'Time', 'linX', 'linY', 'linZ', 'gyrX', 'gyrY', 'gyrZ'});
@@ -529,9 +550,6 @@ function [timestamps] = find_slips_and_tips(imuData,method)
     %% Final output
     timestamps = mask(keep,:);
     timestamps.EndTime = endTimeLog(keep);
-
-    %% Adjust for 0.01ms delay
-    timestamps.Time = timestamps.Time - 0.01;
 
     
 
@@ -734,10 +752,14 @@ function parameters = get_params(config,angle,emconfig)
 
     % fprintf('emconfig: %s | class: %s | size: %s\n', ...
     %     string(emconfig), class(emconfig), mat2str(size(emconfig)));
+    
+    if ~ismember(config, {'flat','RA','single'})
+        error('Invalid config "%s". Must be one of: flat, RA, single.', config);
+    end
 
-    parameters.mu = 0.8;
-    parameters.r = 77;
-    parameters.reff = 77/2;
+    parameters.mu = 1.0;
+    parameters.r = 0.077/18;
+    parameters.reff = parameters.r*8;
 
     m_em = 0.4;
     m_pm = 0.002*19;
@@ -750,33 +772,39 @@ function parameters = get_params(config,angle,emconfig)
 
     Gg = zeros(6,6);
 
+    c = 1.0;
+    p_magnet = 450;
+    em_magnet = 1400;
+    steel_s = 1.0;
+    floor_s = 0.0;
+
     if ismember(config, {'flat','RA'})
         % Contact confidence
-        parameters.c = [0.8,0.8]; % Account for lack of coverage
+        parameters.c = [c,c]; % Account for lack of coverage
 
         % Calculate Adhesion Force
         mask = parseOnOff(emconfig);
-        parameters.Fd = [450,450] + mask'.*[1400,1400];
+        parameters.Fd = [p_magnet,p_magnet] + mask'.*[em_magnet,em_magnet];
     end
     
     if strcmp(config,'single')
         % Contact confidence
-        parameters.c = [0.8]; % Account for lack of coverage
+        parameters.c = [c]; % Account for lack of coverage
 
         % Calculate Adhesion Force
         mask = double(emconfig == "on");
-        parameters.Fd = [450] + mask*[1400];
+        parameters.Fd = [p_magnet] + mask*[1400];
         
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [1.0];
+            parameters.s = [steel_s];
         else
             parameters.s = zeros(1,1);
         end 
 
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(1,1);
-        trans = [0 0 70.533];
+        trans = [0 0 70.533]*0.001;
         rot = eye(3);
         parameters.G{1} = getGMatrix(trans,rot);
 
@@ -784,7 +812,7 @@ function parameters = get_params(config,angle,emconfig)
         parameters.m = m_EM_Interface_Single + m_EM_plate + m_force + m_pm + m_em;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [0.0 0.0 47.0220];
+        trans = [0.0 0.0 47.0220]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
         
@@ -792,7 +820,7 @@ function parameters = get_params(config,angle,emconfig)
     elseif strcmp(config,'flat')
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [1.0,1.0];
+            parameters.s = [steel_s,steel_s];
         else
             parameters.s = zeros(2,1);
         end 
@@ -800,14 +828,14 @@ function parameters = get_params(config,angle,emconfig)
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(2,1);
 
-        trans = [77.1820; -63.8840; 69.0410];
+        trans = [77.1820; -63.8840; 69.0410]*0.001;
         rot = [0.6428  -0.7660  0.0000;
             0.7660   0.6428  0.0000;
             0.0000   0.0000  1.0000];
 
         parameters.G{1} = getGMatrix(trans, rot);
 
-        trans = [-271.0299; 220.6576; 68.5300];
+        trans = [-271.0299; 220.6576; 68.5300]*0.001;
         rot = [0.6428  -0.7660  0.0000;
             0.7660   0.6428  0.0000;
             0.0000   0.0000  1.0000];
@@ -818,29 +846,29 @@ function parameters = get_params(config,angle,emconfig)
         parameters.m = m_EM_Interface_Long*2 + m_Flat_Plate + m_EM_plate + m_force + m_pm + m_em;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [-97.8237 82.0855 68.5300];
+        trans = [-97.8237 82.0855 68.5300]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
 
     elseif strcmp(config,'RA')
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [1.0,1.0];
+            parameters.s = [steel_s,steel_s];
         else
-            parameters.s = [0.0,1.0];
+            parameters.s = [0.0,steel_s];
         end 
         
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(2,1);
 
-        trans = [77.1820; -63.8840; 69.0410];
+        trans = [77.1820; -63.8840; 69.0410]*0.001;
         rot = [0.6428  -0.7660  0.0000;
             0.7660   0.6428  0.0000;
             0.0000   0.0000  1.0000];
 
         parameters.G{1} = getGMatrix(trans, rot);
 
-        trans = [-165.2400; 138.6500; -246.4600];
+        trans = [-165.2400; 138.6500; -246.4600]*0.001;
         rot = [0.6428  0.0000  -0.7660;
             0.7660  0.0000  0.6428;
             0.0000  -1.0000  0.0000];
@@ -851,30 +879,32 @@ function parameters = get_params(config,angle,emconfig)
         parameters.m = m_EM_Interface_Long*2 + m_RA_Plate + m_EM_plate + m_force + m_pm + m_em;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [-44.0290 37.3830 -88.7095];
+        trans = [-44.0290 37.3830 -88.7095]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
     end
     
     g_base = [0.0,0.0,-9.81];
+        
 
     if strcmp(angle,'0')
-        g = v_rot(g_base,pi,x);
+        g = rotateVector(g_base,pi,'x');
     elseif strcmp(angle,'90')
-        g = v_rot(g_base,pi/2,x);
-        g = v_rot(g,deg2rad(-40),z); % rotate to match sensor frame in x and y
+        g = rotateVector(g_base,pi/2,'x');
+        g = rotateVector(g,deg2rad(-40),'z'); % rotate to match sensor frame in x and y
     elseif strcmp(angle,'90V')
-        g = v_rot(g_base,pi/2,x);
-        g = v_rot(g,deg2rad(-130),z); % rotate to match sensor frame in x and y
+        g = rotateVector(g_base,pi/2,'x');
+        g = rotateVector(g,deg2rad(-130),'z'); % rotate to match sensor frame in x and y
     else
         g = g_base;
     end 
     
-    g = [g,0,0,0];
+    g = [g',0,0,0]
 
     parameters.gravity = Gg*g.';
 
     print_parameters(parameters);
+    
     
 end
 
@@ -942,8 +972,8 @@ end
 function [x,beta] = obtain_gamma_cnstr(parameters,wrench)
     
     %% Add Gravity 
-    %%sensor_wrench = wrench + parameters.gravity;
-    sensor_wrench = wrench;
+    sensor_wrench = wrench + parameters.gravity;
+    %%sensor_wrench = wrench;
 
     %% Solve optimisation problem
     [x,beta] = solveSOCP(parameters,sensor_wrench);
@@ -970,6 +1000,12 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % -----------------------------
     % Setup x and objective function
     % -----------------------------
+    % f = ones(6*nc+1,1);
+    % f(end) = -1;
+    % 
+    % for i = 1:nc
+    %     f((i-1)*6+3) = -1; % maximise normal forces
+    % end
     f = zeros(6*nc+1,1);
     f(end) = -1;
     
@@ -977,9 +1013,11 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % Linear equality
     % -----------------------------
     Aeq = zeros(6, 6*nc + 1);
-
+    
     for i = 1:nc
         cols = (6*(i-1)+1):(6*i);
+        c_mat = ones(6,1).*c(i);
+        c_mat(3,1) = 1;
         Aeq(:, cols) = c(i) * G{i};
     end
 
@@ -1001,7 +1039,7 @@ function [x,beta] = solveSOCP(parameters, wrench)
         rows = (4*(i-1)+1):(4*i);
     
         % z component (always 1)
-        A(rows, cols(3)) = 1;
+        A(rows, cols(3)) = -1;
     
         % angular x/y contributions
         A(rows(1:2), cols(4)) = [ 2/r; -2/r ];
@@ -1019,7 +1057,7 @@ function [x,beta] = solveSOCP(parameters, wrench)
     for i = 1:nc
         Asoc = zeros(3, ncol);
 
-        startCol = 7*(i-1) + 1;
+        startCol = 6*(i-1) + 1;
 
         Asoc(1, startCol)     = 1;
         Asoc(2, startCol + 1) = 1;
@@ -1044,6 +1082,9 @@ function [x,beta] = solveSOCP(parameters, wrench)
     lb = ones(1,6*nc+1)*-Inf;
     ub = ones(1,6*nc+1)*Inf;
     [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub);
+    beta = -beta;
+
+    displaySOCPConstraints(x, parameters, wrench);
 end
 
 function v_rot = rotateVector(vector, angle, axis)
@@ -1082,5 +1123,387 @@ switch axis
 end
 
 v_rot = R * v;
+
+end
+
+function plotOptimVariables(time, variables, nc, beta, wrenchTimepoints, motionTimepoints)
+
+N = size(variables,1);
+
+% ----------------------------
+% Extract gamma
+% ----------------------------
+beta_copy = beta;
+gamma = min(min(beta_copy, [], 2), [], 3);
+
+% ----------------------------
+% Create figure + tiles
+% ----------------------------
+fig = figure('Color', 'w', 'Name', sprintf('Optimised Variables'));
+tl = tiledlayout(fig, nc*2+2, 1, ...
+    'TileSpacing', 'compact', ...
+    'Padding', 'compact');
+
+% ============================
+% Plot each contact wrench
+% ============================
+for i = 1:nc
+
+    cols = (6*(i-1)+1):(6*i);
+
+    F = variables(:, cols(1:3));
+    T = variables(:, cols(4:6));
+
+    % --- Force ---
+    ax1 = nexttile;
+    plot(ax1, time, F, 'LineWidth', 1.5);
+    grid(ax1, 'on');
+    xlabel(ax1, 'Time (s)');
+    ylabel(ax1, sprintf('Force_%d', i));
+    title(ax1, sprintf('Force_%d', i), 'Interpreter', 'none');
+    hold(ax1, 'on');
+
+    xl = xline(ax1, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+    xe = xline(ax1, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+    set(xl, 'HandleVisibility', 'off');
+    set(xe, 'HandleVisibility', 'off');
+
+    % --- Torque ---
+    ax2 = nexttile;
+    plot(ax2, time, T, 'LineWidth', 1.5);
+    grid(ax2, 'on');
+    xlabel(ax2, 'Time (s)');
+    ylabel(ax2, sprintf('Torque_%d', i));
+    title(ax2, sprintf('Torque_%d', i), 'Interpreter', 'none');
+    hold(ax2, 'on');
+
+    xl = xline(ax2, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+    xe = xline(ax2, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+    set(xl, 'HandleVisibility', 'off');
+    set(xe, 'HandleVisibility', 'off');
+
+    legend(ax1, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
+    legend(ax2, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
+end
+
+% ============================
+% Plot gamma (last tile)
+% ============================
+axg = nexttile;
+
+plot(axg, time, gamma, 'LineWidth', 1.5);
+grid(axg, 'on');
+xlabel(axg, 'Time (s)');
+ylabel(axg, 'gamma\_cnstr');
+title(axg, 'gamma_cnstr', 'Interpreter', 'none');
+hold(axg, 'on');
+
+xl = xline(axg, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+xe = xline(axg, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+set(xl, 'HandleVisibility', 'off');
+set(xe, 'HandleVisibility', 'off');
+
+% ============================
+% Plot beta (contact-wise + envelope)
+% ============================
+axb = nexttile;
+
+hold(axb, 'on');
+grid(axb, 'on');    
+grid on;
+title(sprintf('Contact %d', i));
+xlabel('Time (s)');
+ylabel('\beta');
+
+names = strings(1, 4*nc);
+
+for i = 1:nc
+    base = (i-1)*4;
+
+    plot(time, beta(:,1,i), 'LineWidth', 1.5);
+    plot(time, beta(:,2,i), 'LineWidth', 1.5);
+    plot(time, beta(:,3,i), 'LineWidth', 1.5);
+    plot(time, beta(:,4,i), 'LineWidth', 1.5);
+
+    names(base + 1) = sprintf('f_z_%d constraint', i);
+    names(base + 2) = sprintf('tau_x_%d constraint', i);
+    names(base + 3) = sprintf('tau_y_%d constraint', i);
+    names(base + 4) = sprintf('friction cone_%d', i);
+    
+end
+
+
+legend(names, 'Location','best');
+
+
+% time markers (same style as others)
+xl = xline(axb, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
+xe = xline(axb, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+set(xl, 'HandleVisibility', 'off');
+set(xe, 'HandleVisibility', 'off');
+end
+
+function displaySOCPConstraints(x, parameters, wrench)
+
+    nc   = numel(parameters.c);
+    mu   = parameters.mu;
+    r    = parameters.r;
+    reff = parameters.reff;
+    c    = parameters.c;
+    G    = parameters.G;
+    Fa   = parameters.s .* parameters.Fd;
+    beta = x(end);
+
+    fprintf('\n=========================================\n');
+    fprintf('SUBSTITUTED SOCP VARIABLES\n');
+    fprintf('=========================================\n');
+
+    fprintf('\nnc   = %d\n', nc);
+    fprintf('mu   = %.6f\n', mu);
+    fprintf('r    = %.6f\n', r);
+    fprintf('reff = %.6f\n', reff);
+
+    fprintf('\nc:\n');
+    disp(c(:)');
+
+    fprintf('Fa:\n');
+    disp(Fa(:)');
+
+    fprintf('\n-----------------------------------------\n');
+    fprintf('DECISION VECTOR x VALUES\n');
+    fprintf('-----------------------------------------\n');
+
+    for i = 1:nc
+        idx = 6*(i-1)+(1:6);
+
+        fx = x(idx(1));
+        fy = x(idx(2));
+        fz = x(idx(3));
+        mx = x(idx(4));
+        my = x(idx(5));
+        mz = x(idx(6));
+
+        fprintf('\nContact %d:\n', i);
+        fprintf('  fx = %.6f\n', fx);
+        fprintf('  fy = %.6f\n', fy);
+        fprintf('  fz = %.6f\n', fz);
+        fprintf('  mx = %.6f\n', mx);
+        fprintf('  my = %.6f\n', my);
+        fprintf('  mz = %.6f\n', mz);
+
+        fprintf('\n  LINEAR INEQUALITIES (SUBSTITUTED)\n');
+
+        fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
+            fz, r, mx, Fa(i));
+        fprintf('    beta <= %.6f\n', ...
+            Fa(i) + fz - (2/r)*mx);
+
+        fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
+            fz, r, mx, Fa(i));
+        fprintf('    beta <= %.6f\n', ...
+            Fa(i) + fz + (2/r)*mx);
+
+        fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
+            fz, r, my, Fa(i));
+        fprintf('    beta <= %.6f\n', ...
+            Fa(i) + fz - (2/r)*my);
+
+        fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
+            fz, r, my, Fa(i));
+        fprintf('    beta <= %.6f\n', ...
+            Fa(i) + fz + (2/r)*my);
+
+        fprintf('\n  SOC INEQUALITIES (SUBSTITUTED)\n');
+
+        fprintf('   ||[(%.6f); (%.6f); (%.6f/%.6f)]|| <= %.6f*(%.6f + %.6f) - beta\n', ...
+        fx, fy, mz, reff, mu, fz, Fa(i));
+            fprintf('    beta <= %.6f\n', ...
+        mu*(fz + Fa(i)) - sqrt(fx^2 + fy^2 + (mz/reff)^2));
+        
+
+     end
+
+    fprintf('\n-----------------------------------------\n');
+    fprintf('BETA\n');
+    fprintf('-----------------------------------------\n');
+    fprintf('beta = %.6f\n', x(end));
+
+    fprintf('\n-----------------------------------------\n');
+    fprintf('WRENCH\n');
+    fprintf('-----------------------------------------\n');
+    disp(wrench);
+
+end
+
+function [beta, all_beta] = get_beta(x, parameters)
+
+    nc   = numel(parameters.c);
+    mu   = parameters.mu;
+    r    = parameters.r;
+    reff = parameters.reff;
+    c    = parameters.c;
+    Fa   = parameters.s .* parameters.Fd;
+
+    beta_vals = [];
+    all_beta = [];
+
+    for i = 1:nc
+
+        cols = (6*(i-1)+1):(6*i);
+
+        fx = x(cols(1));
+        fy = x(cols(2));
+        fz = x(cols(3));
+        mx = x(cols(4));
+        my = x(cols(5));
+        mz = x(cols(6));
+
+        % -------------------------
+        % Linear inequality bounds
+        % -------------------------
+        b1 = Fa(i) + fz;
+        b2 = Fa(i) + fz - (2/r)*abs(mx);
+        b3 = Fa(i) + fz - (2/r)*abs(my);
+
+
+        % -------------------------
+        % SOC bound
+        % -------------------------
+        b4 = mu*(fz + Fa(i)) - sqrt(fx^2 + fy^2 + (mz/reff)^2);
+
+        % -------------------------
+        % Contact beta
+        % -------------------------
+        beta_i = min([b1 b2 b3 b4]);
+
+        beta_vals = [beta_vals; beta_i];
+        all_beta(:,i) = [b1 b2 b3 b4];
+
+    end
+
+    % global beta is most restrictive contact
+    beta = min(beta_vals);
+end
+
+function export_sensor_dataset_csv( ...
+    time, imuData, fx, fy, fz, tx, ty, tz, ...
+    contactForces, variables, parameters, ...
+    gamma_cnstr, beta, all_beta, ...
+    motionTimepoints, wrenchTimepoints, ...
+    selectedRecord, csvMeta, sampleRate)
+
+%=========================================================
+% BUILD ATTACHED SIGNAL (motion-based union of intervals)
+%=========================================================
+attached = zeros(length(time),1);
+
+for k = 1:height(motionTimepoints)
+
+    tStart = motionTimepoints.Time(k);
+    tEnd   = motionTimepoints.EndTime(k);
+
+    attached(time >= tStart & time <= tEnd) = 1;
+end
+
+%=========================================================
+% CONTACT FORCE EXTRACTION
+% variables layout: [F1x F1y F1z T1x T1y T1z F2...]
+%=========================================================
+nc = numel(parameters.c);
+
+contact_1_forces = nan(length(time),3);
+contact_2_forces = nan(length(time),3);
+
+if nc >= 1
+    c1 = variables(:,1:6);
+    contact_1_forces = c1(:,1:3);
+end
+
+if nc >= 2
+    c2 = variables(:,7:12);
+    contact_2_forces = c2(:,1:3);
+end
+
+%=========================================================
+% BUILD OUTPUT TABLE
+%=========================================================
+N = length(time);
+
+T = table();
+
+% --- core signals ---
+T.time = time;
+
+T.imu_linX = imuData.linX;
+T.imu_linY = imuData.linY;
+T.imu_linZ = imuData.linZ;
+
+T.imu_gyrX = imuData.gyrX;
+T.imu_gyrY = imuData.gyrY;
+T.imu_gyrZ = imuData.gyrZ;
+
+T.Fx = fx;
+T.Fy = fy;
+T.Fz = fz;
+
+T.Tx = tx;
+T.Ty = ty;
+T.Tz = tz;
+
+% --- contacts ---
+T.contact_1_fx = contact_1_forces(:,1);
+T.contact_1_fy = contact_1_forces(:,2);
+T.contact_1_fz = contact_1_forces(:,3);
+
+T.contact_2_fx = contact_2_forces(:,1);
+T.contact_2_fy = contact_2_forces(:,2);
+T.contact_2_fz = contact_2_forces(:,3);
+
+% --- constraints ---
+T.gamma = gamma_cnstr;
+T.beta  = beta;
+
+% flatten all_beta: [N x 4 x nc]
+for i = 1:nc
+    T.(sprintf('f_x_%d_constraint', i))   = all_beta(:,1,i);
+    T.(sprintf('tau_x_%d_constraint', i)) = all_beta(:,2,i);
+    T.(sprintf('tau_y_%d_constraint', i)) = all_beta(:,3,i);
+    T.(sprintf('soc_%d_constraint', i))    = all_beta(:,4,i);
+end
+
+% --- attachment label ---
+T.attached = attached;
+
+%=========================================================
+% METADATA (repeated per row for ML compatibility)
+%=========================================================
+T.filename_force = repmat(string(selectedRecord.('Force Sensor Filename')), N, 1);
+T.filename_imu   = repmat(string(selectedRecord.('IMU Filename')), N, 1);
+
+T.configuration  = repmat(string(selectedRecord.Configuration), N, 1);
+T.angle          = repmat(string(selectedRecord.('Angle from Gravity')), N, 1);
+T.em_config      = repmat(string(selectedRecord.('EM Config')), N, 1);
+
+T.sample_rate = repmat(sampleRate, N, 1);
+
+% optional: model params summary
+T.mu   = repmat(parameters.mu, N, 1);
+T.mass = repmat(parameters.m, N, 1);
+
+%=========================================================
+% WRITE CSV
+%=========================================================
+scriptDir = fileparts(mfilename('fullpath'));
+outDir = fullfile(scriptDir, '..', 'Force_Sensor_Data', 'Exported');
+if ~exist(outDir, 'dir')
+    mkdir(outDir);
+end
+
+outName = sprintf('dataset_%s.csv', string(datetime("now","Format","yyyyMMdd_HHmmss")));
+outPath = fullfile(outDir, outName);
+
+writetable(T, outPath);
+
+fprintf('Dataset exported:\n%s\n', outPath);
 
 end
