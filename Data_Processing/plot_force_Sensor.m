@@ -758,8 +758,10 @@ function parameters = get_params(config,angle,emconfig)
     end
 
     parameters.mu = 1.0;
-    parameters.r = 0.077/18;
-    parameters.reff = parameters.r*8;
+    r = 0.077;
+    parameters.r_x = r/6;
+    parameters.r_y = r/18;
+    parameters.reff = r;
 
     m_em = 0.4;
     m_pm = 0.002*19;
@@ -915,7 +917,8 @@ function print_parameters(p)
 
     % --- Scalars ---
     print_field('mu', p.mu);
-    print_field('r', p.r);
+    print_field('r_x', p.r_x);
+    print_field('r_y', p.r_y);
     print_field('reff', p.reff);
     print_field('m', p.m);
 
@@ -991,7 +994,8 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % -----------------------------
     nc   = numel(parameters.c);     % number of contacts
     mu   = parameters.mu;
-    r    = parameters.r;
+    r_x    = parameters.r_x;
+    r_y    = parameters.r_y;
     reff = parameters.reff;
     c    = parameters.c;
     G    = parameters.G;
@@ -1042,8 +1046,8 @@ function [x,beta] = solveSOCP(parameters, wrench)
         A(rows, cols(3)) = -1;
     
         % angular x/y contributions
-        A(rows(1:2), cols(4)) = [ 2/r; -2/r ];
-        A(rows(3:4), cols(5)) = [ 2/r; -2/r ];
+        A(rows(1:2), cols(4)) = [ 2/r_x; -2/r_x ];
+        A(rows(3:4), cols(5)) = [ 2/r_y; -2/r_y ];
     
         % last column = 1
         A(rows, end) = 1;
@@ -1247,7 +1251,8 @@ function displaySOCPConstraints(x, parameters, wrench)
 
     nc   = numel(parameters.c);
     mu   = parameters.mu;
-    r    = parameters.r;
+    r_x    = parameters.r_x;
+    r_y    = parameters.r_y;
     reff = parameters.reff;
     c    = parameters.c;
     G    = parameters.G;
@@ -1260,7 +1265,8 @@ function displaySOCPConstraints(x, parameters, wrench)
 
     fprintf('\nnc   = %d\n', nc);
     fprintf('mu   = %.6f\n', mu);
-    fprintf('r    = %.6f\n', r);
+    fprintf('r_x    = %.6f\n', r_x);
+    fprintf('r_y    = %.6f\n', r_y);
     fprintf('reff = %.6f\n', reff);
 
     fprintf('\nc:\n');
@@ -1294,24 +1300,24 @@ function displaySOCPConstraints(x, parameters, wrench)
         fprintf('\n  LINEAR INEQUALITIES (SUBSTITUTED)\n');
 
         fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
-            fz, r, mx, Fa(i));
+            fz, r_x, mx, Fa(i));
         fprintf('    beta <= %.6f\n', ...
-            Fa(i) + fz - (2/r)*mx);
+            Fa(i) + fz - (2/r_x)*mx);
 
         fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
-            fz, r, mx, Fa(i));
+            fz, r_x, mx, Fa(i));
         fprintf('    beta <= %.6f\n', ...
-            Fa(i) + fz + (2/r)*mx);
+            Fa(i) + fz + (2/r_x)*mx);
 
         fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
-            fz, r, my, Fa(i));
+            fz, r_y, my, Fa(i));
         fprintf('    beta <= %.6f\n', ...
-            Fa(i) + fz - (2/r)*my);
+            Fa(i) + fz - (2/r_y)*my);
 
         fprintf('    beta - %.6f + ( 2/%.6f)*%.6f  <= %.6f\n', ...
-            fz, r, my, Fa(i));
+            fz, r_y, my, Fa(i));
         fprintf('    beta <= %.6f\n', ...
-            Fa(i) + fz + (2/r)*my);
+            Fa(i) + fz + (2/r_y)*my);
 
         fprintf('\n  SOC INEQUALITIES (SUBSTITUTED)\n');
 
@@ -1339,7 +1345,8 @@ function [beta, all_beta] = get_beta(x, parameters)
 
     nc   = numel(parameters.c);
     mu   = parameters.mu;
-    r    = parameters.r;
+    r_x    = parameters.r_x;
+    r_y    = parameters.r_y;
     reff = parameters.reff;
     c    = parameters.c;
     Fa   = parameters.s .* parameters.Fd;
@@ -1362,8 +1369,8 @@ function [beta, all_beta] = get_beta(x, parameters)
         % Linear inequality bounds
         % -------------------------
         b1 = Fa(i) + fz;
-        b2 = Fa(i) + fz - (2/r)*abs(mx);
-        b3 = Fa(i) + fz - (2/r)*abs(my);
+        b2 = Fa(i) + fz - (2/r_x)*abs(mx);
+        b3 = Fa(i) + fz - (2/r_y)*abs(my);
 
 
         % -------------------------
