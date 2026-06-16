@@ -36,7 +36,8 @@ if height(dataReg) == 0
 end
 
 displayItems = buildDisplayItems(dataReg);
-selectedIdx = runSelectionDialog(displayItems);
+infoItems = buildInfoItems(dataReg);
+selectedIdx = runSelectionDialog(displayItems, infoItems);
 
 if isempty(selectedIdx)
     return;
@@ -227,30 +228,73 @@ for k = 1:height(dataReg)
 end
 end
 
-function selectedIdx = runSelectionDialog(displayItems)
+function infoItems = buildInfoItems(dataReg)
+% Build auxiliary info (date + notes) aligned with displayItems indexing.
+
+infoItems = strings(height(dataReg), 1);
+
+for k = 1:height(dataReg)
+
+    % Extract date-like prefix from Force Sensor Filename
+    forceFile = string(dataReg.('Force Sensor Filename')(k));
+
+    % Assumes format: YYYY-MM-DD_HH-MM-SS_...
+    dateToken = extractBefore(forceFile, "_");
+
+    % Convert to datetime and reformat
+    dt = datetime(dateToken, 'InputFormat', 'yyyy-MM-dd');
+    dateText = "Date: " + string(dt, 'dd/MM/yyyy');
+
+    % Notes
+    notesText = string(dataReg.Notes(k));
+    if strlength(strtrim(notesText)) == 0
+        notesText = "Notes: (none)";
+    else
+        notesText = "Notes: " + notesText;
+    end
+
+    infoItems(k) = dateText + " | " + notesText;
+end
+
+end
+
+function selectedIdx = runSelectionDialog(displayItems, infoItems)
 % Show GUI selector and return chosen row index (or [] on cancel).
 selectedIdx = [];
 
-selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', 'Position', [500 400 900 170]);
+width = 900;
+height = 520;
+
+selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', 'Position', [500 400 900 520]);
 selectionFig.UserData = [];
 selectionFig.CloseRequestFcn = @cancelSelection;
 
 uilabel(selectionFig, ...
-    'Position', [20 140 200 22], ...
-    'Text', 'Select Dataset');
+    'Position', [20 height-40 200 40], ...
+    'Text', 'Select Dataset:', ...
+    'FontSize', 14);
+
+infoLabel = uilabel(selectionFig, ...
+    'Position', [220 height-40 660 40], ...
+    'Text', infoItems(1), ...
+    'FontSize', 14,  ...
+    'HorizontalAlignment', 'right');
 
 dropdown = uidropdown( ...
     selectionFig, ...
-    'Position', [20 90 860 40], ...
+    'Position', [20 height-100 860 45], ...
     'FontSize', 14, ...
     'Items', cellstr(displayItems), ...
     'ItemsData', 1:numel(displayItems), ...
-    'Value', 1);
+    'Value', 1, ...
+    'ValueChangedFcn', @updateInfo);
 
-uibutton(selectionFig, 'Text', 'Load Dataset', 'Position', [340 28 220 34], ...
+infoLabel.Text = infoItems(dropdown.Value);
+
+uibutton(selectionFig, 'Text', 'Load Dataset', 'Position', [340 25 220 34], ...
     'ButtonPushedFcn', @loadSelection);
 
-uibutton(selectionFig, 'Text', 'Cancel', 'Position', [580 28 120 34], ...
+uibutton(selectionFig, 'Text', 'Cancel', 'Position', [580 25 120 34], ...
     'ButtonPushedFcn', @cancelSelection);
 
 uiwait(selectionFig);
@@ -268,6 +312,11 @@ end
     function cancelSelection(~, ~)
         selectionFig.UserData = [];
         uiresume(selectionFig);
+    end
+    
+    function updateInfo(~, ~)
+        idx = dropdown.Value;
+        infoLabel.Text = infoItems(idx);
     end
 end
 
