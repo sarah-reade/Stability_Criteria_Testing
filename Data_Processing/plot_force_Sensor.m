@@ -147,6 +147,7 @@ wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
     'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
 wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
 
+
 ax = nexttile;
 plot(ax, time, force, 'LineWidth', 1.5);
 grid(ax, 'on');
@@ -180,6 +181,27 @@ for k = 1:height(wrench)
     [beta(k),all_beta(k,:,:)] = get_beta(variables(k,:),parameters);
 end
 
+datetime_string = csvMeta.startTime;
+datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
+outDir = make_directory(datetime_string);
+
+
+export_sensor_dataset_csv( outDir, ...
+   time,wrenchData,imuData,variables,beta,motionTimepoints);
+
+save_meta_data(outDir, 'metaData.txt', fscsvPath,imucsvPath)
+
+
+isNeg = beta < 50;
+
+% Find rising/falling edges
+d = diff([false; isNeg; false]);
+startIdx = find(d == 1)-1;
+endIdx   = find(d == -1);
+
+negSegments = [startIdx, endIdx];
+negTimeSegments = [time(negSegments(:,1)), time(negSegments(:,2))];
+
 ax = nexttile;
 hold(ax,"on");
 grid(ax, 'on');
@@ -189,29 +211,47 @@ plot(ax, time, beta, 'LineWidth', 1.5);
 xlabel(ax, 'Time (s)');
 ylabel(ax, 'value');
 title(ax, 'gamma_cnstr', 'Interpreter', 'none');
+plot_background(ax,negTimeSegments);
 % legend(ax, {'gamma', 'beta'}, 'Location', 'best');
 
-if height(wrenchTimepoints.Time) > 0
     
-    xl = xline(ax, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-    xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-    set(xl, 'HandleVisibility', 'off');
-    set(xe, 'HandleVisibility', 'off');
-    
-    for k = 1:numel(axs)
-        if axs(k) == infoAx
-            continue
-        end
-        xl = xline(axs(k), wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-        xe = xline(axs(k), motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-        set(xl, 'HandleVisibility', 'off');
-        set(xe, 'HandleVisibility', 'off');
+plotMotionPoints(ax,motionTimepoints);
+
+for k = 1:numel(axs)
+    if axs(k) == infoAx
+        continue
     end
     
-    plotOptimVariables(time, variables, nc, all_beta, wrenchTimepoints, motionTimepoints)
+    plotMotionPoints(axs(k),motionTimepoints);
+    plot_background(axs(k),negTimeSegments);
 end
+    
+
+plotOptimVariables(time, variables, nc, all_beta, negTimeSegments,motionTimepoints)
 
 sgtitle(sprintf('Sensor data: %s | %s', fscsvFilename, imucsvFilename), 'Interpreter', 'none');
+
+end
+
+function plot_background(ax,negTimeSegments)
+    yl = ylim(ax);
+    
+    hold(ax, 'on');
+    
+    for i = 1:size(negTimeSegments,1)
+        x1 = negTimeSegments(i,1);
+        x2 = negTimeSegments(i,2);
+    
+        patch(ax, ...
+            [x1 x2 x2 x1], ...
+            [yl(1) yl(1) yl(2) yl(2)], ...
+            'r', ...
+            'FaceAlpha', 0.15, ...
+            'EdgeColor', 'none', ...
+            'HandleVisibility', 'off');
+    end
+    
+    uistack(ax.Children, 'bottom'); % keep shading behind lines
 end
 
 function displayItems = buildDisplayItems(dataReg)
@@ -426,12 +466,9 @@ else
 end
 end
 
-function [imuData] = plot_two_sensor_average(rawData, tl)
-%PLOT_TWO_SENSOR_AVERAGE Align two sensors by timestamp and average signals
+function [imuData] = plot_two_sensor_average(rawData, time)
 
-% If input is not provided, you can paste data into a table externally
-% rawData must have columns:
-% Time_ms, SensorID, LinX, LinY, LinZ, GyrX, GyrY, GyrZ
+%PLOT_TWO_SENSOR_AVERAGE Align two sensors by timestamp and average signals
 
 if ischar(rawData) || isstring(rawData)
     rawData = readtable(rawData, 'Delimiter', ',');
@@ -458,17 +495,19 @@ s2.Properties.VariableNames(2:end) = strcat(s2.Properties.VariableNames(2:end), 
 % --- Align on union of timestamps ---
 T = outerjoin(s1, s2, "Keys", "TimeSec", "MergeKeys", true);
 
-% --- Average signals where both sensors exist ---
-linX = mean([T.mean_LinX_s1, T.mean_LinX_s2], 2, 'omitnan');
-linY = mean([T.mean_LinY_s1, T.mean_LinY_s2], 2, 'omitnan');
-linZ = mean([T.mean_LinZ_s1, T.mean_LinZ_s2], 2, 'omitnan');
+% --- Sort by time (important for interpolation) ---
+T = sortrows(T, "TimeSec");
 
-gyrX = mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan');
-gyrY = mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan');
-gyrZ = mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan');
+tData = T.TimeSec;
 
-offset = 0.01;
-time = T.TimeSec - offset;
+% --- Interpolate all signals onto requested time vector ---
+linX = interp1(tData, mean([T.mean_LinX_s1, T.mean_LinX_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+linY = interp1(tData, mean([T.mean_LinY_s1, T.mean_LinY_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+linZ = interp1(tData, mean([T.mean_LinZ_s1, T.mean_LinZ_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+
+gyrX = interp1(tData, mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+gyrY = interp1(tData, mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+gyrZ = interp1(tData, mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan'), time, 'linear', 'extrap');
 
 imuData = table(time, linX, linY, linZ, gyrX, gyrY, gyrZ, ...
     'VariableNames', {'Time', 'linX', 'linY', 'linZ', 'gyrX', 'gyrY', 'gyrZ'});
@@ -1179,7 +1218,7 @@ v_rot = R * v;
 
 end
 
-function plotOptimVariables(time, variables, nc, beta, wrenchTimepoints, motionTimepoints)
+function plotOptimVariables(time, variables, nc, beta, negTimeSegments,motionTimepoints)
 
 N = size(variables,1);
 
@@ -1216,10 +1255,10 @@ for i = 1:nc
     title(ax1, sprintf('Force_%d', i), 'Interpreter', 'none');
     hold(ax1, 'on');
 
-    xl = xline(ax1, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-    xe = xline(ax1, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-    set(xl, 'HandleVisibility', 'off');
-    set(xe, 'HandleVisibility', 'off');
+    
+    plotMotionPoints(ax1,motionTimepoints);
+    plot_background(ax1,negTimeSegments);
+    
 
     % --- Torque ---
     ax2 = nexttile;
@@ -1229,11 +1268,11 @@ for i = 1:nc
     ylabel(ax2, sprintf('Torque_%d', i));
     title(ax2, sprintf('Torque_%d', i), 'Interpreter', 'none');
     hold(ax2, 'on');
-
-    xl = xline(ax2, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-    xe = xline(ax2, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-    set(xl, 'HandleVisibility', 'off');
-    set(xe, 'HandleVisibility', 'off');
+    
+    
+    plotMotionPoints(ax2,motionTimepoints)
+    plot_background(ax2,negTimeSegments);
+    
 
     legend(ax1, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
     legend(ax2, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
@@ -1251,10 +1290,9 @@ ylabel(axg, 'gamma\_cnstr');
 title(axg, 'gamma_cnstr', 'Interpreter', 'none');
 hold(axg, 'on');
 
-xl = xline(axg, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-xe = xline(axg, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-set(xl, 'HandleVisibility', 'off');
-set(xe, 'HandleVisibility', 'off');
+
+plotMotionPoints(axg,motionTimepoints);
+plot_background(axg,negTimeSegments);
 
 % ============================
 % Plot beta (contact-wise + envelope)
@@ -1290,10 +1328,17 @@ legend(names, 'Location','best');
 
 
 % time markers (same style as others)
-xl = xline(axb, wrenchTimepoints.Time, '--r', 'LineWidth', 1);
-xe = xline(axb, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
-set(xl, 'HandleVisibility', 'off');
-set(xe, 'HandleVisibility', 'off');
+plotMotionPoints(axb,motionTimepoints);
+plot_background(axb,negTimeSegments);
+end
+
+function plotMotionPoints(ax,motionTimepoints)
+    if ~isempty(motionTimepoints)
+        xl = xline(ax, motionTimepoints.Time, '--r', 'LineWidth', 1);
+        xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+        set(xl, 'HandleVisibility', 'off');
+        set(xe, 'HandleVisibility', 'off');
+    end
 end
 
 function displaySOCPConstraints(x, parameters, wrench)
@@ -1441,44 +1486,24 @@ function [beta, all_beta] = get_beta(x, parameters)
     beta = min(beta_vals);
 end
 
-function export_sensor_dataset_csv( ...
-    time, imuData, fx, fy, fz, tx, ty, tz, ...
-    contactForces, variables, parameters, ...
-    gamma_cnstr, beta, all_beta, ...
-    motionTimepoints, wrenchTimepoints, ...
-    selectedRecord, csvMeta, sampleRate)
+function outDir = make_directory(datetime_string)
 
-%=========================================================
-% BUILD ATTACHED SIGNAL (motion-based union of intervals)
-%=========================================================
-attached = zeros(length(time),1);
+    scriptDir = fileparts(mfilename('fullpath'));
+    outDir = fullfile(scriptDir, '..', 'Force_Sensor_Data', datetime_string);
+    i = 1;
+    while exist(outDir, 'dir')
+        outDir = sprintf("%s_%s", outDir, i);
+        i = i + 1;
+    end
+    
+    mkdir(outDir);
 
-for k = 1:height(motionTimepoints)
-
-    tStart = motionTimepoints.Time(k);
-    tEnd   = motionTimepoints.EndTime(k);
-
-    attached(time >= tStart & time <= tEnd) = 1;
 end
 
-%=========================================================
-% CONTACT FORCE EXTRACTION
-% variables layout: [F1x F1y F1z T1x T1y T1z F2...]
-%=========================================================
-nc = numel(parameters.c);
 
-contact_1_forces = nan(length(time),3);
-contact_2_forces = nan(length(time),3);
+function export_sensor_dataset_csv( outDir, ...
+    time,wrenchData,imuData,optimised_variables,gamma,motionTimepoints)
 
-if nc >= 1
-    c1 = variables(:,1:6);
-    contact_1_forces = c1(:,1:3);
-end
-
-if nc >= 2
-    c2 = variables(:,7:12);
-    contact_2_forces = c2(:,1:3);
-end
 
 %=========================================================
 % BUILD OUTPUT TABLE
@@ -1487,79 +1512,176 @@ N = length(time);
 
 T = table();
 
-% --- core signals ---
 T.time = time;
 
-T.imu_linX = imuData.linX;
-T.imu_linY = imuData.linY;
-T.imu_linZ = imuData.linZ;
+% Wrench data
+T.Fx   = wrenchData.Fx;
+T.Fy   = wrenchData.Fy;
+T.Fz   = wrenchData.Fz;
+T.Taux = wrenchData.Tx;
+T.Tauy = wrenchData.Ty;
+T.Tauz = wrenchData.Tz;
 
-T.imu_gyrX = imuData.gyrX;
-T.imu_gyrY = imuData.gyrY;
-T.imu_gyrZ = imuData.gyrZ;
+% IMU data
+height(T)
+height(imuData)
+imuData
+T.LinX = imuData.linX;
+T.LinY = imuData.linY;
+T.LinZ = imuData.linZ;
 
-T.Fx = fx;
-T.Fy = fy;
-T.Fz = fz;
+T.GyrX = imuData.gyrX;
+T.GyrY = imuData.gyrY;
+T.GyrZ = imuData.gyrZ;
 
-T.Tx = tx;
-T.Ty = ty;
-T.Tz = tz;
+% Optimisation Variables
+nc = (size(optimised_variables,2) - 1) / 6;
 
-% --- contacts ---
-T.contact_1_fx = contact_1_forces(:,1);
-T.contact_1_fy = contact_1_forces(:,2);
-T.contact_1_fz = contact_1_forces(:,3);
 
-T.contact_2_fx = contact_2_forces(:,1);
-T.contact_2_fy = contact_2_forces(:,2);
-T.contact_2_fz = contact_2_forces(:,3);
+nc = (size(optimised_variables,2)) / 6;
 
-% --- constraints ---
-T.gamma = gamma_cnstr;
-T.beta  = beta;
+T = struct();
 
-% flatten all_beta: [N x 4 x nc]
 for i = 1:nc
-    T.(sprintf('f_x_%d_constraint', i))   = all_beta(:,1,i);
-    T.(sprintf('tau_x_%d_constraint', i)) = all_beta(:,2,i);
-    T.(sprintf('tau_y_%d_constraint', i)) = all_beta(:,3,i);
-    T.(sprintf('soc_%d_constraint', i))    = all_beta(:,4,i);
+    k = i-1;
+
+    T.(sprintf('Fx_%d', i))   = optimised_variables(:,k*6+1);
+    T.(sprintf('Fy_%d', i))   = optimised_variables(:,k*6+2);
+    T.(sprintf('Fz_%d', i))   = optimised_variables(:,k*6+3);
+    T.(sprintf('Taux_%d', i)) = optimised_variables(:,k*6+4);
+    T.(sprintf('Tauy_%d', i)) = optimised_variables(:,k*6+5);
+    T.(sprintf('Tauz_%d', i)) = optimised_variables(:,k*6+6);
 end
 
-% --- attachment label ---
-T.attached = attached;
+T.gamma = gamma;
 
-%=========================================================
-% METADATA (repeated per row for ML compatibility)
-%=========================================================
-T.filename_force = repmat(string(selectedRecord.('Force Sensor Filename')), N, 1);
-T.filename_imu   = repmat(string(selectedRecord.('IMU Filename')), N, 1);
+N = numel(time);
+M = numel(motionTimepoints.Time);
 
-T.configuration  = repmat(string(selectedRecord.Configuration), N, 1);
-T.angle          = repmat(string(selectedRecord.('Angle from Gravity')), N, 1);
-T.em_config      = repmat(string(selectedRecord.('EM Config')), N, 1);
+T.attached = ones(N,1);   % default = 1 (outside motion)
 
-T.sample_rate = repmat(sampleRate, N, 1);
+for j = 1:M
+    inInterval = (time >= motionTimepoints.Time(j)) & ...
+                 (time <= motionTimepoints.EndTime(j));
 
-% optional: model params summary
-T.mu   = repmat(parameters.mu, N, 1);
-T.mass = repmat(parameters.m, N, 1);
+    T.attached(inInterval) = 0;
+end
+
 
 %=========================================================
 % WRITE CSV
 %=========================================================
-scriptDir = fileparts(mfilename('fullpath'));
-outDir = fullfile(scriptDir, '..', 'Force_Sensor_Data', 'Exported');
-if ~exist(outDir, 'dir')
-    mkdir(outDir);
-end
 
-outName = sprintf('dataset_%s.csv', string(datetime("now","Format","yyyyMMdd_HHmmss")));
+outName = 'data.csv';
 outPath = fullfile(outDir, outName);
 
 writetable(T, outPath);
 
 fprintf('Dataset exported:\n%s\n', outPath);
 
+end
+
+function save_meta_data(folder, filename, forceSensorFile,imuFile)
+
+% ===================== BASIC INFO =====================
+ID = 1;                          % int
+nc = 3;                          % number of contacts (int)
+
+Configuration = "Nominal";      % string
+EM_Configuration = "Default";   % string
+
+StartTime = datetime("now");    % or string if preferred
+Notes = "Initial test run";     % string
+
+% ===================== GLOBAL PARAMETERS =====================
+mu    = 0.6;
+r_x   = 0.12;
+r_y   = 0.08;
+r_eff = 0.10;
+mass  = 5.0;
+
+% ===================== PER-CONTACT VARIABLES =====================
+% Each indexed by contact i = 1...nc
+
+f_d     = [1.0, 1.2, 1.1];      % size nc
+s       = [0.05, 0.06, 0.04];   % size nc
+gravity = [9.81, 9.81, 9.81];   % size nc
+c       = [0.3, 0.35, 0.32];    % size nc
+
+% ===================== ADJOINT MATRICES =====================
+% 6x6xnc tensor
+A = zeros(6,6,nc);
+
+A(:,:,1) = eye(6);
+A(:,:,2) = 2*eye(6);
+A(:,:,3) = 3*eye(6);
+    
+
+% ===== Build full file path =====
+fullpath = fullfile(folder, filename);
+
+% ===== Open file for writing =====
+fid = fopen(fullpath, 'w');
+if fid == -1
+    error('Failed to create output file: %s', fullpath);
+end
+
+% ===== Optional: format datetime =====
+if isdatetime(StartTime)
+    StartTimeStr = char(StartTime, 'yyyy-MM-dd HH:mm:ss');
+else
+    StartTimeStr = StartTime;
+end
+
+% ===== Header =====
+fprintf(fid, '==================== SYSTEM REPORT ====================\n\n');
+
+fprintf(fid, 'ID: %d\n', ID);
+fprintf(fid, 'Number of Contacts: %d\n', nc);
+fprintf(fid, 'Configuration: %s\n', Configuration);
+fprintf(fid, 'EM Configuration: %s\n', EM_Configuration);
+fprintf(fid, 'Start Time: %s\n', StartTimeStr);
+fprintf(fid, 'Notes: %s\n\n', Notes);
+fprintf(fid, 'Force Sensor Filename: %s\n\n', forceSensorFile);
+fprintf(fid, 'IMU Filename: %s\n\n', imuFile);
+
+% ===== Global Parameters =====
+fprintf(fid, '-------------------- PARAMETERS --------------------\n');
+fprintf(fid, 'mu     : %.6f\n', mu);
+fprintf(fid, 'r_x    : %.6f\n', r_x);
+fprintf(fid, 'r_y    : %.6f\n', r_y);
+fprintf(fid, 'r_eff  : %.6f\n', r_eff);
+fprintf(fid, 'mass   : %.6f\n\n', mass);
+
+% ===== Contact Data =====
+fprintf(fid, '-------------------- CONTACT DATA --------------------\n\n');
+
+for i = 1:nc
+    fprintf(fid, 'CONTACT %d\n', i);
+    fprintf(fid, '-----------------------------------------------------\n');
+
+    fprintf(fid, 'f_d     : %.6f\n', f_d(i));
+    fprintf(fid, 's       : %.6f\n', s(i));
+    fprintf(fid, 'gravity : %.6f\n', gravity(i));
+    fprintf(fid, 'c       : %.6f\n\n', c(i));
+
+    fprintf(fid, 'Adjoint Matrix (6x6):\n');
+
+    % A = adjoint(:,:,i);   % assumes 6x6xnc array
+    % 
+    % for r = 1:6
+    %     fprintf(fid, '  % .6f  % .6f  % .6f  % .6f  % .6f  % .6f\n', A(r,:));
+    % end
+
+    fprintf(fid, '\n');
+end
+
+% ===== Footer =====
+fprintf(fid, '==================== END OF REPORT ====================\n');
+
+% ===== Close file =====
+fclose(fid);
+
+% ===== Optional confirmation =====
+fprintf('Report written to: %s\n', fullpath);
 end
