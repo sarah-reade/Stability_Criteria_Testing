@@ -37,200 +37,223 @@ end
 
 displayItems = buildDisplayItems(dataReg);
 infoItems = buildInfoItems(dataReg);
-selectedIdx = runSelectionDialog(displayItems, infoItems);
+selectedIdxs = runSelectionDialog(displayItems, infoItems);
 
-if isempty(selectedIdx)
+if isempty(selectedIdxs)
     return;
 end
 
-selectedRecord = dataReg(selectedIdx, :);
-fscsvFilename = string(selectedRecord.('Force Sensor Filename')) + ".csv";
-fscsvPath = fullfile(dataDir, fscsvFilename);
-imucsvFilename = string(selectedRecord.('IMU Filename')) + ".csv";
-imucsvPath = fullfile(dataDir, imucsvFilename);
+for k = 1:numel(selectedIdxs)
 
-if ~isfile(fscsvPath)
-    errordlg(sprintf('The selected CSV file does not exist:\n\n%s', fscsvFilename), 'Missing CSV File');
-    return;
-elseif ~isfile(imucsvPath)
-    errordlg(sprintf('The selected CSV file does not exist:\n\n%s', imucsvFilename), 'Missing CSV File');
-    return;
-end
-
-try
-    % Parse sample rate, sensor channels, and metadata from selected CSV.
-    [sampleRate, sensorData, csvMeta] = readSensorCsv(fscsvPath);
-catch ME
-    errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
-    return;
-end
-
-t = duration(string(sensorData.Time), ...
-    'InputFormat', 'hh:mm:ss.SSS');
-
-time = seconds(t);
-
-% Apply rolling-average smoothing and downsample to approximately 10 Hz.
-targetRate = 10; % desired display rate (Hz)
-decFactor = max(1, round(sampleRate / targetRate));
-
-% Smooth then downsample each component. Use movmean if available,
-% otherwise use a convolution fallback for older MATLAB versions.
-win = decFactor;
-useMovmean = exist('movmean', 'file') == 2;
-
-if useMovmean
-    fx_s = movmean(sensorData.Fx, win);
-    fy_s = movmean(sensorData.Fy, win);
-    fz_s = movmean(sensorData.Fz, win);
-    tx_s = movmean(sensorData.Tx, win);
-    ty_s = movmean(sensorData.Ty, win);
-    tz_s = movmean(sensorData.Tz, win);
-else
-    k = ones(win,1) / win;
-    fx_s = conv(sensorData.Fx, k, 'same');
-    fy_s = conv(sensorData.Fy, k, 'same');
-    fz_s = conv(sensorData.Fz, k, 'same');
-    tx_s = conv(sensorData.Tx, k, 'same');
-    ty_s = conv(sensorData.Ty, k, 'same');
-    tz_s = conv(sensorData.Tz, k, 'same');
-end
-
-idx = 1:decFactor:height(sensorData);
-time = time(idx);
-fx_ds = (fx_s(idx))-fx_s(2);
-fy_ds = (fy_s(idx))-fy_s(2);
-fz_ds = -((fz_s(idx))-fz_s(2));
-tx_ds = tx_s(idx)-tx_s(2);
-ty_ds = ty_s(idx)-ty_s(2);
-tz_ds = -(tz_s(idx)-tz_s(2));
-
-% Effective sample rate after decimation (used for derivative scaling).
-sampleRate = sampleRate / decFactor;
-
-force = [fx_ds, fy_ds, fz_ds];
-torque = [tx_ds, ty_ds, tz_ds];
-
-% % Force normalization (remove initial offset)
-% force0 = force(1,:);              % [fx0 fy0 fz0]
-% force = force - force0;
-% 
-% % Torque normalization
-% torque0 = torque(1,:);            % [tx0 ty0 tz0]
-% torque = torque - torque0;
-
-infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(sensorData));
-
-% Layout: info panel, force components, torque components, derivative panel.
-fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
-tl = tiledlayout(fig, 6, 1, ...
-    'TileSpacing', 'compact', ...
-    'Padding', 'compact');
-
-infoAx = nexttile;
-axis(infoAx, 'off');
-text(infoAx, 0.01, 0.5, infoText, ...
-    'Units', 'normalized', ...
-    'Interpreter', 'none', ...
-    'FontName', 'Consolas', ...
-    'FontSize', 10, ...
-    'VerticalAlignment', 'middle', ...
-    'BackgroundColor', [0.96 0.98 1.0], ...
-    'EdgeColor', [0.55 0.65 0.8], ...
-    'Margin', 10);
-
-imuRawData = readtable(imucsvPath, 'Delimiter', ',', 'TextType', 'string');
-imuData = plot_two_sensor_average(imuRawData, tl);
-motionTimepoints = find_slips_and_tips(imuData, 'mag');
-
-wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
-    'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
-wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
-
-
-ax = nexttile;
-plot(ax, time, force, 'LineWidth', 1.5);
-grid(ax, 'on');
-xlabel(ax, 'Time (s)');
-ylabel(ax, 'Force (N)');
-title(ax, 'Force Components', 'Interpreter', 'none');
-legend(ax, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
-hold(ax, 'on');
-
-ax = nexttile;
-plot(ax, time, torque, 'LineWidth', 1.5);
-grid(ax, 'on');
-xlabel(ax, 'Time (s)');
-ylabel(ax, 'Torque (Nm)');
-title(ax, 'Torque Components', 'Interpreter', 'none');
-legend(ax, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
-hold(ax, 'on');
-
-axs = findall(gcf, 'Type', 'axes');
-
-parameters = get_params(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'));
-
-wrench = [force,torque];
-gamma_cnstr = zeros(height(wrench),1);
-nc = numel(parameters.c);
-variables = zeros(height(wrench),nc*6 + 1);
-beta = zeros(height(wrench),1);
-all_beta = zeros(height(wrench),4,nc);
-for k = 1:height(wrench)
-    [variables(k,:),gamma_cnstr(k)] = obtain_gamma_cnstr(parameters,wrench(k,:)');
-    [beta(k),all_beta(k,:,:)] = get_beta(variables(k,:),parameters);
-end
-
-datetime_string = csvMeta.startTime;
-datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
-outDir = make_directory(datetime_string);
-
-
-export_sensor_dataset_csv( outDir, ...
-   time,wrenchData,imuData,variables,beta,motionTimepoints);
-
-save_meta_data(outDir, 'metaData.txt', fscsvPath,imucsvPath)
-
-
-isNeg = beta < 50;
-
-% Find rising/falling edges
-d = diff([false; isNeg; false]);
-startIdx = find(d == 1)-1;
-endIdx   = find(d == -1);
-
-negSegments = [startIdx, endIdx];
-negTimeSegments = [time(negSegments(:,1)), time(negSegments(:,2))];
-
-ax = nexttile;
-hold(ax,"on");
-grid(ax, 'on');
-
-% plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
-plot(ax, time, beta, 'LineWidth', 1.5);
-xlabel(ax, 'Time (s)');
-ylabel(ax, 'value');
-title(ax, 'gamma_cnstr', 'Interpreter', 'none');
-plot_background(ax,negTimeSegments);
-% legend(ax, {'gamma', 'beta'}, 'Location', 'best');
-
+    selectedIdx = selectedIdxs(k);   % force scalar index
+    selectedRecord = dataReg(selectedIdx, :);
+    fscsvFilename = string(selectedRecord.('Force Sensor Filename')) + ".csv";
+    fscsvPath = fullfile(dataDir, fscsvFilename);
+    imucsvFilename = string(selectedRecord.('IMU Filename')) + ".csv";
+    imucsvPath = fullfile(dataDir, imucsvFilename);
     
-plotMotionPoints(ax,motionTimepoints);
-
-for k = 1:numel(axs)
-    if axs(k) == infoAx
-        continue
+    if ~isfile(fscsvPath)
+        errordlg(sprintf('The selected CSV file does not exist:\n\n%s', fscsvFilename), 'Missing CSV File');
+        return;
+    elseif ~isfile(imucsvPath)
+        errordlg(sprintf('The selected CSV file does not exist:\n\n%s', imucsvFilename), 'Missing CSV File');
+        return;
     end
     
-    plotMotionPoints(axs(k),motionTimepoints);
-    plot_background(axs(k),negTimeSegments);
-end
+    try
+        % Parse sample rate, sensor channels, and metadata from selected CSV.
+        [sampleRate, sensorData, csvMeta] = readSensorCsv(fscsvPath);
+    catch ME
+        errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
+        return;
+    end
     
-
-plotOptimVariables(time, variables, nc, all_beta, negTimeSegments,motionTimepoints)
-
-sgtitle(sprintf('Sensor data: %s | %s', fscsvFilename, imucsvFilename), 'Interpreter', 'none');
-
+    t = duration(string(sensorData.Time), ...
+        'InputFormat', 'hh:mm:ss.SSS');
+    
+    time = seconds(t);
+    
+    % Apply rolling-average smoothing and downsample to approximately 10 Hz.
+    targetRate = 10; % desired display rate (Hz)
+    decFactor = max(1, round(sampleRate / targetRate));
+    
+    % Smooth then downsample each component. Use movmean if available,
+    % otherwise use a convolution fallback for older MATLAB versions.
+    win = decFactor;
+    useMovmean = exist('movmean', 'file') == 2;
+    
+    if useMovmean
+        fx_s = movmean(sensorData.Fx, win);
+        fy_s = movmean(sensorData.Fy, win);
+        fz_s = movmean(sensorData.Fz, win);
+        tx_s = movmean(sensorData.Tx, win);
+        ty_s = movmean(sensorData.Ty, win);
+        tz_s = movmean(sensorData.Tz, win);
+    else
+        k = ones(win,1) / win;
+        fx_s = conv(sensorData.Fx, k, 'same');
+        fy_s = conv(sensorData.Fy, k, 'same');
+        fz_s = conv(sensorData.Fz, k, 'same');
+        tx_s = conv(sensorData.Tx, k, 'same');
+        ty_s = conv(sensorData.Ty, k, 'same');
+        tz_s = conv(sensorData.Tz, k, 'same');
+    end
+    
+    idx = 1:decFactor:height(sensorData);
+    time = time(idx);
+    fx_ds = (fx_s(idx))-fx_s(2);
+    fy_ds = (fy_s(idx))-fy_s(2);
+    fz_ds = -((fz_s(idx))-fz_s(2));
+    tx_ds = tx_s(idx)-tx_s(2);
+    ty_ds = ty_s(idx)-ty_s(2);
+    tz_ds = -(tz_s(idx)-tz_s(2));
+    
+    % Effective sample rate after decimation (used for derivative scaling).
+    sampleRate = sampleRate / decFactor;
+    
+    force = [fx_ds, fy_ds, fz_ds];
+    torque = [tx_ds, ty_ds, tz_ds];
+    
+    % % Force normalization (remove initial offset)
+    % force0 = force(1,:);              % [fx0 fy0 fz0]
+    % force = force - force0;
+    % 
+    % % Torque normalization
+    % torque0 = torque(1,:);            % [tx0 ty0 tz0]
+    % torque = torque - torque0;
+    
+    infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(sensorData));
+    
+    % Layout: info panel, force components, torque components, derivative panel.
+    fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
+    tl = tiledlayout(fig, 6, 1, ...
+        'TileSpacing', 'compact', ...
+        'Padding', 'compact');
+    
+    infoAx = nexttile;
+    axis(infoAx, 'off');
+    text(infoAx, 0.01, 0.5, infoText, ...
+        'Units', 'normalized', ...
+        'Interpreter', 'none', ...
+        'FontName', 'Consolas', ...
+        'FontSize', 10, ...
+        'VerticalAlignment', 'middle', ...
+        'BackgroundColor', [0.96 0.98 1.0], ...
+        'EdgeColor', [0.55 0.65 0.8], ...
+        'Margin', 10);
+    
+    imuRawData = readtable(imucsvPath, 'Delimiter', ',', 'TextType', 'string');
+    imuData = plot_two_sensor_average(imuRawData, time);
+    [params,motionTimepoints] = find_slips_and_tips(imuData, 'mag');
+    
+    scriptParameters = params;
+    scriptParameters.hz = targetRate;
+    
+    wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
+        'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
+    wrenchTimepoints = find_wrench(motionTimepoints,wrenchData);
+    
+    
+    ax = nexttile;
+    plot(ax, time, force, 'LineWidth', 1.5);
+    grid(ax, 'on');
+    xlabel(ax, 'Time (s)');
+    ylabel(ax, 'Force (N)');
+    title(ax, 'Force Components', 'Interpreter', 'none');
+    legend(ax, {'F_x', 'F_y', 'F_z'}, 'Location', 'best');
+    hold(ax, 'on');
+    
+    ax = nexttile;
+    plot(ax, time, torque, 'LineWidth', 1.5);
+    grid(ax, 'on');
+    xlabel(ax, 'Time (s)');
+    ylabel(ax, 'Torque (Nm)');
+    title(ax, 'Torque Components', 'Interpreter', 'none');
+    legend(ax, {'T_x', 'T_y', 'T_z'}, 'Location', 'best');
+    hold(ax, 'on');
+    
+    axs = findall(gcf, 'Type', 'axes');
+    
+    parameters = get_params(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'));
+    
+    wrench = [force,torque];
+    gamma_cnstr = zeros(height(wrench),1);
+    nc = numel(parameters.c);
+    variables = zeros(height(wrench),nc*6 + 1);
+    beta = zeros(height(wrench),1);
+    all_beta = zeros(height(wrench),4,nc);
+    loop_time = zeros(height(wrench),1);
+    for k = 1:height(wrench)
+        tStart = tic;
+        [variables(k,:),gamma_cnstr(k)] = obtain_gamma_cnstr(parameters,wrench(k,:)');
+        [beta(k),all_beta(k,:,:)] = get_beta(variables(k,:),parameters);
+        loop_time(k) = toc(tStart);
+    end
+    
+    datetime_string = csvMeta.startTime;
+    datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
+    outDir = make_directory(datetime_string);
+    
+    
+    export_sensor_dataset_csv( outDir, ...
+       time,wrenchData,imuData,variables,beta,motionTimepoints,loop_time);
+    
+    save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters)
+    
+    
+    isNeg = beta < 50;
+    
+    % Find rising/falling edges
+    d = diff([false; isNeg; false]);
+    startIdx = find(d == 1)-1;
+    endIdx   = find(d == -1);
+    
+    negSegments = [startIdx, endIdx];
+    negTimeSegments = [time(negSegments(:,1)), time(negSegments(:,2))];
+    
+    ax = nexttile;
+    hold(ax,"on");
+    grid(ax, 'on');
+    
+    % plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
+    plot(ax, time, beta, 'LineWidth', 1.5);
+    xlabel(ax, 'Time (s)');
+    ylabel(ax, 'value');
+    title(ax, 'gamma_cnstr', 'Interpreter', 'none');
+    plot_background(ax,negTimeSegments);
+    % legend(ax, {'gamma', 'beta'}, 'Location', 'best');
+    
+        
+    plotMotionPoints(ax,motionTimepoints);
+    
+    for k = 1:numel(axs)
+        if axs(k) == infoAx
+            continue
+        end
+        
+        plotMotionPoints(axs(k),motionTimepoints);
+        plot_background(axs(k),negTimeSegments);
+    end
+        
+    
+    fig2 = plotOptimVariables(time, variables, nc, all_beta, negTimeSegments,motionTimepoints);
+    
+    % Make figure 1 full screen
+    set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
+    drawnow;
+    
+    savefig(fig, fullfile(outDir, "fig1.fig"));
+    print(fig, fullfile(outDir, "fig1.svg"), "-dsvg");
+    
+    % Make figure 2 full screen
+    set(fig2, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
+    drawnow;
+    
+    savefig(fig2, fullfile(outDir, "fig2.fig"));
+    print(fig2, fullfile(outDir, "fig2.svg"), "-dsvg");
+    
+    sgtitle(sprintf('Sensor data: %s | %s', fscsvFilename, imucsvFilename), 'Interpreter', 'none');
+end
 end
 
 function plot_background(ax,negTimeSegments)
@@ -299,42 +322,47 @@ end
 end
 
 function selectedIdx = runSelectionDialog(displayItems, infoItems)
-% Show GUI selector and return chosen row index (or [] on cancel).
+% Multi-selection GUI selector (returns vector of indices or [])
+
 selectedIdx = [];
 
 width = 900;
 height = 520;
 
-selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', 'Position', [500 400 900 520]);
+selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', ...
+    'Position', [500 400 width height]);
+
 selectionFig.UserData = [];
+
 selectionFig.CloseRequestFcn = @cancelSelection;
 
 uilabel(selectionFig, ...
-    'Position', [20 height-40 200 40], ...
-    'Text', 'Select Dataset:', ...
+    'Position', [20 height-40 300 30], ...
+    'Text', 'Select Dataset(s):', ...
     'FontSize', 14);
 
 infoLabel = uilabel(selectionFig, ...
-    'Position', [220 height-40 660 40], ...
+    'Position', [220 height-40 660 30], ...
     'Text', infoItems(1), ...
-    'FontSize', 14,  ...
+    'FontSize', 12, ...
     'HorizontalAlignment', 'right');
 
-dropdown = uidropdown( ...
-    selectionFig, ...
-    'Position', [20 height-100 860 45], ...
-    'FontSize', 14, ...
-    'Items', cellstr(displayItems), ...
-    'ItemsData', 1:numel(displayItems), ...
-    'Value', 1, ...
-    'ValueChangedFcn', @updateInfo);
+% --- MULTI-SELECT TABLE (replaces dropdown) ---
+tbl = uitable(selectionFig, ...
+    'Position', [20 80 width-40 height-140], ...
+    'Data', displayItems(:), ...
+    'ColumnName', {'Dataset'}, ...
+    'ColumnEditable', false, ...
+    'CellSelectionCallback', @updateSelection);
 
-infoLabel.Text = infoItems(dropdown.Value);
+selectedRows = [];
 
-uibutton(selectionFig, 'Text', 'Load Dataset', 'Position', [340 25 220 34], ...
+uibutton(selectionFig, 'Text', 'Load Dataset(s)', ...
+    'Position', [340 25 220 34], ...
     'ButtonPushedFcn', @loadSelection);
 
-uibutton(selectionFig, 'Text', 'Cancel', 'Position', [580 25 120 34], ...
+uibutton(selectionFig, 'Text', 'Cancel', ...
+    'Position', [580 25 120 34], ...
     'ButtonPushedFcn', @cancelSelection);
 
 uiwait(selectionFig);
@@ -344,19 +372,23 @@ if isvalid(selectionFig)
     delete(selectionFig);
 end
 
+    function updateSelection(~, event)
+        if isempty(event.Indices)
+            return;
+        end
+        selectedRows = unique(event.Indices(:,1));
+        idx = selectedRows(1);
+        infoLabel.Text = infoItems(idx);
+    end
+
     function loadSelection(~, ~)
-        selectionFig.UserData = dropdown.Value;
+        selectionFig.UserData = selectedRows;
         uiresume(selectionFig);
     end
 
     function cancelSelection(~, ~)
         selectionFig.UserData = [];
         uiresume(selectionFig);
-    end
-    
-    function updateInfo(~, ~)
-        idx = dropdown.Value;
-        infoLabel.Text = infoItems(idx);
     end
 end
 
@@ -468,46 +500,64 @@ end
 
 function [imuData] = plot_two_sensor_average(rawData, time)
 
+
 %PLOT_TWO_SENSOR_AVERAGE Align two sensors by timestamp and average signals
 
 if ischar(rawData) || isstring(rawData)
     rawData = readtable(rawData, 'Delimiter', ',');
 end
 
-% --- Convert timestamp string -> duration in seconds ---
+% --- Ensure time is numeric vector (NOT graphics object) ---
+time = time(:);
+if ~isnumeric(time)
+    error('Input "time" must be a numeric vector in seconds.');
+end
+
+% --- Parse timestamp -> seconds ---
 t = duration(string(rawData.Time_ms), 'InputFormat', 'hh:mm:ss.SSS');
 tSec = seconds(t);
 
-rawData.TimeSec = round(tSec, 3); % 1 ms alignment
+rawData.TimeSec = round(tSec, 3);
 
 % --- Split sensors ---
 s1 = rawData(rawData.SensorID == 1, :);
 s2 = rawData(rawData.SensorID == 2, :);
 
-% --- Aggregate each sensor by time (handles duplicates) ---
+% --- Aggregate ---
 s1 = groupsummary(s1, "TimeSec", "mean");
 s2 = groupsummary(s2, "TimeSec", "mean");
 
-% Rename grouped outputs for clarity
+% --- Rename variables ---
 s1.Properties.VariableNames(2:end) = strcat(s1.Properties.VariableNames(2:end), "_s1");
 s2.Properties.VariableNames(2:end) = strcat(s2.Properties.VariableNames(2:end), "_s2");
 
-% --- Align on union of timestamps ---
+% --- Align ---
 T = outerjoin(s1, s2, "Keys", "TimeSec", "MergeKeys", true);
-
-% --- Sort by time (important for interpolation) ---
 T = sortrows(T, "TimeSec");
 
-tData = T.TimeSec;
+tData = T.TimeSec(:);
 
-% --- Interpolate all signals onto requested time vector ---
-linX = interp1(tData, mean([T.mean_LinX_s1, T.mean_LinX_s2], 2, 'omitnan'), time, 'linear', 'extrap');
-linY = interp1(tData, mean([T.mean_LinY_s1, T.mean_LinY_s2], 2, 'omitnan'), time, 'linear', 'extrap');
-linZ = interp1(tData, mean([T.mean_LinZ_s1, T.mean_LinZ_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+% --- Build averaged signals safely ---
+linX = mean([T.mean_LinX_s1, T.mean_LinX_s2], 2, 'omitnan');
+linY = mean([T.mean_LinY_s1, T.mean_LinY_s2], 2, 'omitnan');
+linZ = mean([T.mean_LinZ_s1, T.mean_LinZ_s2], 2, 'omitnan');
 
-gyrX = interp1(tData, mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan'), time, 'linear', 'extrap');
-gyrY = interp1(tData, mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan'), time, 'linear', 'extrap');
-gyrZ = interp1(tData, mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan'), time, 'linear', 'extrap');
+gyrX = mean([T.mean_GyrX_s1, T.mean_GyrX_s2], 2, 'omitnan');
+gyrY = mean([T.mean_GyrY_s1, T.mean_GyrY_s2], 2, 'omitnan');
+gyrZ = mean([T.mean_GyrZ_s1, T.mean_GyrZ_s2], 2, 'omitnan');
+
+% --- Ensure numeric for interp1 ---
+tData = double(tData);
+time  = double(time);
+
+% --- Interpolate onto provided time vector ---
+linX = interp1(tData, linX, time, 'linear', 'extrap');
+linY = interp1(tData, linY, time, 'linear', 'extrap');
+linZ = interp1(tData, linZ, time, 'linear', 'extrap');
+
+gyrX = interp1(tData, gyrX, time, 'linear', 'extrap');
+gyrY = interp1(tData, gyrY, time, 'linear', 'extrap');
+gyrZ = interp1(tData, gyrZ, time, 'linear', 'extrap');
 
 imuData = table(time, linX, linY, linZ, gyrX, gyrY, gyrZ, ...
     'VariableNames', {'Time', 'linX', 'linY', 'linZ', 'gyrX', 'gyrY', 'gyrZ'});
@@ -531,17 +581,20 @@ legend('GyrX','GyrY','GyrZ', 'Location', 'best');
 
 end
 
-function [timestamps] = find_slips_and_tips(imuData,method)
+function [params,timestamps] = find_slips_and_tips(imuData,method)
 
     %% Build binary mask
 
     mask = table();
+    params.linThreshold = 1.0;
+    params.gyrThreshold = 0.06;
+    params.refractoryPeriod = 0.8;
 
     if strcmp(method,'ind')
         %% User thresholds
-        linThreshold = 1.0;
-        gyrThreshold = 0.06;
-        refractoryPeriod = 0.8;   % seconds
+        linThreshold = params.linThreshold;
+        gyrThreshold = params.gyrThreshold;
+        refractoryPeriod = params.refractoryPeriod;   % seconds
 
         mask.Time = imuData.Time;
 
@@ -993,7 +1046,7 @@ function parameters = get_params(config,angle,emconfig)
 
     parameters.gravity = Gg*g.';
 
-    print_parameters(parameters);
+    %print_parameters(parameters);
     
     
 end
@@ -1176,7 +1229,7 @@ function [x,beta] = solveSOCP(parameters, wrench)
     [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub);
     beta = -beta;
 
-    displaySOCPConstraints(x, parameters, wrench);
+    %displaySOCPConstraints(x, parameters, wrench);
 end
 
 function v_rot = rotateVector(vector, angle, axis)
@@ -1218,7 +1271,7 @@ v_rot = R * v;
 
 end
 
-function plotOptimVariables(time, variables, nc, beta, negTimeSegments,motionTimepoints)
+function fig = plotOptimVariables(time, variables, nc, beta, negTimeSegments,motionTimepoints)
 
 N = size(variables,1);
 
@@ -1490,10 +1543,12 @@ function outDir = make_directory(datetime_string)
 
     scriptDir = fileparts(mfilename('fullpath'));
     outDir = fullfile(scriptDir, '..', 'Force_Sensor_Data', datetime_string);
+    baseDir = outDir;
     i = 1;
-    while exist(outDir, 'dir')
-        outDir = sprintf("%s_%s", outDir, i);
-        i = i + 1;
+    
+    while exist(outDir, 'dir') 
+        outDir = sprintf("%s__(%s)", baseDir, string(i)); 
+        i = i + 1; 
     end
     
     mkdir(outDir);
@@ -1502,7 +1557,7 @@ end
 
 
 function export_sensor_dataset_csv( outDir, ...
-    time,wrenchData,imuData,optimised_variables,gamma,motionTimepoints)
+    time,wrenchData,imuData,optimised_variables,gamma,motionTimepoints,loop_time)
 
 
 %=========================================================
@@ -1525,7 +1580,6 @@ T.Tauz = wrenchData.Tz;
 % IMU data
 height(T)
 height(imuData)
-imuData
 T.LinX = imuData.linX;
 T.LinY = imuData.linY;
 T.LinZ = imuData.linZ;
@@ -1534,13 +1588,13 @@ T.GyrX = imuData.gyrX;
 T.GyrY = imuData.gyrY;
 T.GyrZ = imuData.gyrZ;
 
+T.loopTime = loop_time;
+
 % Optimisation Variables
 nc = (size(optimised_variables,2) - 1) / 6;
 
 
 nc = (size(optimised_variables,2)) / 6;
-
-T = struct();
 
 for i = 1:nc
     k = i-1;
@@ -1581,41 +1635,46 @@ fprintf('Dataset exported:\n%s\n', outPath);
 
 end
 
-function save_meta_data(folder, filename, forceSensorFile,imuFile)
+function save_meta_data(folder, filename, selectedRecord,parameters, scriptParameters)
 
 % ===================== BASIC INFO =====================
-ID = 1;                          % int
-nc = 3;                          % number of contacts (int)
+ID = selectedRecord.ID;                          % int
+nc = length(parameters.c);                          % number of contacts (int)
 
-Configuration = "Nominal";      % string
-EM_Configuration = "Default";   % string
+Configuration = string(selectedRecord.Configuration);      % string
+EM_Configuration = string(selectedRecord.('EM Config'));   % string
+GravityAngle = string(selectedRecord.('Angle from Gravity'));
 
-StartTime = datetime("now");    % or string if preferred
-Notes = "Initial test run";     % string
+ProcessedTime = datetime("now");    % or string if preferred
+Notes = selectedRecord.('Notes');     % string
 
-% ===================== GLOBAL PARAMETERS =====================
-mu    = 0.6;
-r_x   = 0.12;
-r_y   = 0.08;
-r_eff = 0.10;
-mass  = 5.0;
+forceSensorFile = string(selectedRecord.('Force Sensor Filename')) + ".csv";
+imuFile = string(selectedRecord.('IMU Filename')) + ".csv";
+
+% ==================== SCRIPT PARAMETERS ===================
+hz = scriptParameters.hz;
+imu_linThresh = scriptParameters.linThreshold;
+imu_gyrThresh = scriptParameters.gyrThreshold;
+imu_refPer = scriptParameters.refractoryPeriod;
+
+% ===================== MODEL PARAMETERS =====================
+mu    = parameters.mu;
+r_x   = parameters.r_x;
+r_y   = parameters.r_y;
+r_eff = parameters.reff;
+mass  = parameters.m;
 
 % ===================== PER-CONTACT VARIABLES =====================
 % Each indexed by contact i = 1...nc
 
-f_d     = [1.0, 1.2, 1.1];      % size nc
-s       = [0.05, 0.06, 0.04];   % size nc
-gravity = [9.81, 9.81, 9.81];   % size nc
-c       = [0.3, 0.35, 0.32];    % size nc
+f_d     = parameters.Fd;      % size nc
+s       = parameters.s;   % size nc
+gravity = parameters.gravity;   % size nc
+c       = parameters.c;    % size nc
 
 % ===================== ADJOINT MATRICES =====================
 % 6x6xnc tensor
-A = zeros(6,6,nc);
-
-A(:,:,1) = eye(6);
-A(:,:,2) = 2*eye(6);
-A(:,:,3) = 3*eye(6);
-    
+A = parameters.G;    
 
 % ===== Build full file path =====
 fullpath = fullfile(folder, filename);
@@ -1627,10 +1686,10 @@ if fid == -1
 end
 
 % ===== Optional: format datetime =====
-if isdatetime(StartTime)
-    StartTimeStr = char(StartTime, 'yyyy-MM-dd HH:mm:ss');
+if isdatetime(ProcessedTime)
+    StartTimeStr = char(ProcessedTime, 'dd/MM/yyyy HH:mm:ss');
 else
-    StartTimeStr = StartTime;
+    StartTimeStr = ProcessedTime;
 end
 
 % ===== Header =====
@@ -1640,13 +1699,22 @@ fprintf(fid, 'ID: %d\n', ID);
 fprintf(fid, 'Number of Contacts: %d\n', nc);
 fprintf(fid, 'Configuration: %s\n', Configuration);
 fprintf(fid, 'EM Configuration: %s\n', EM_Configuration);
-fprintf(fid, 'Start Time: %s\n', StartTimeStr);
+fprintf(fid, 'Angle from Gravity: %s\n', GravityAngle);
+fprintf(fid, 'Processed Time: %s\n', StartTimeStr);
 fprintf(fid, 'Notes: %s\n\n', Notes);
 fprintf(fid, 'Force Sensor Filename: %s\n\n', forceSensorFile);
 fprintf(fid, 'IMU Filename: %s\n\n', imuFile);
 
+% ===== Script Parameters =====
+fprintf(fid, '---------------- SCRIPT PARAMETERS -----------------\n');
+fprintf(fid, 'hz    : %.6f\n', hz);
+fprintf(fid, '---------- IMU Thresholds:\n');
+fprintf(fid, 'linThreshold      : %.10f\n', imu_linThresh);
+fprintf(fid, 'gyrThreshold      : %.10f\n', imu_gyrThresh);
+fprintf(fid, 'refractoryPeriod  : %.10f\n', imu_refPer);
+
 % ===== Global Parameters =====
-fprintf(fid, '-------------------- PARAMETERS --------------------\n');
+fprintf(fid, '-------------- OPTIMISATION PARAMETERS ------------\n');
 fprintf(fid, 'mu     : %.6f\n', mu);
 fprintf(fid, 'r_x    : %.6f\n', r_x);
 fprintf(fid, 'r_y    : %.6f\n', r_y);
@@ -1659,19 +1727,18 @@ fprintf(fid, '-------------------- CONTACT DATA --------------------\n\n');
 for i = 1:nc
     fprintf(fid, 'CONTACT %d\n', i);
     fprintf(fid, '-----------------------------------------------------\n');
-
     fprintf(fid, 'f_d     : %.6f\n', f_d(i));
     fprintf(fid, 's       : %.6f\n', s(i));
     fprintf(fid, 'gravity : %.6f\n', gravity(i));
     fprintf(fid, 'c       : %.6f\n\n', c(i));
 
     fprintf(fid, 'Adjoint Matrix (6x6):\n');
+    
+    A_i = A{i};
 
-    % A = adjoint(:,:,i);   % assumes 6x6xnc array
-    % 
-    % for r = 1:6
-    %     fprintf(fid, '  % .6f  % .6f  % .6f  % .6f  % .6f  % .6f\n', A(r,:));
-    % end
+    for r = 1:6
+        fprintf(fid, '  % .6f  % .6f  % .6f  % .6f  % .6f  % .6f\n', A_i(r,:));
+    end
 
     fprintf(fid, '\n');
 end
