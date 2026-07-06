@@ -5,6 +5,7 @@ function plot_force_Sensor()
 scriptDir = fileparts(mfilename('fullpath'));
 dataDir = fullfile(scriptDir, '..', 'Force_Sensor_Data');
 dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
+overwrite = false;
 
 if ~isfile(dataRegPath)
     errordlg(sprintf('Could not find registration file:\n%s', dataRegPath), 'Registration File Missing');
@@ -37,7 +38,7 @@ end
 
 displayItems = buildDisplayItems(dataReg);
 infoItems = buildInfoItems(dataReg);
-selectedIdxs = runSelectionDialog(displayItems, infoItems, dataReg);
+[overwrite,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
 
 if isempty(selectedIdxs)
     return;
@@ -191,13 +192,15 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     datetime_string = csvMeta.startTime;
     datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
-    outDir = make_directory(datetime_string);
+    outDir = make_directory(datetime_string,overwrite);
     
     
     export_sensor_dataset_csv( outDir, ...
        time,wrenchData,imuData,variables,beta,motionTimepoints,loop_time);
     
-    save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters)
+    ppdata = post_process(outDir+"/data.csv");
+
+    save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters,ppdata)
     
     
     isNeg = beta < 50;
@@ -252,8 +255,11 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     savefig(fig2, fullfile(outDir, "fig2.fig"));
     print(fig2, fullfile(outDir, "fig2.svg"), "-dsvg");
+
+    close all;
     
 end
+
 end
 
 function plot_background(ax,negTimeSegments)
@@ -321,10 +327,11 @@ end
 
 end
 
-function selectedIdx = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
+overwrite = false;
 rowCount = height(dataReg);
 selectedMask = false(rowCount, 1);
 selectionConfirmed = false;
@@ -366,10 +373,10 @@ uibutton(actionsGrid, 'Text', 'Clear Selection', 'ButtonPushedFcn', @clearSelect
 uibutton(actionsGrid, 'Text', 'Select All', 'ButtonPushedFcn', @selectAllRows);
 
 %% ---------------- FILTERS (top row) ----------------
-filterGrid = uigridlayout(mainGridLayout, [1 6]);
+filterGrid = uigridlayout(mainGridLayout, [1 8]);
 filterGrid.Layout.Row = 2;
 
-filterGrid.ColumnWidth = {130, '1x', 150, '1x', 130, '1x'};
+filterGrid.ColumnWidth = {100, '1x', 100, '1x', 100, '1x',150, 40};
 filterGrid.RowHeight = {24};
 
 uilabel(filterGrid, 'Text', 'Configuration');
@@ -390,6 +397,11 @@ emDropDown = uidropdown(filterGrid, ...
     'Value', 'All', ...
     'ValueChangedFcn', @onFilterChange);
 
+uilabel(filterGrid, ...
+    'Text', sprintf('Overwrite Existing Files'));
+overwriteCheckbox = uicheckbox(filterGrid, ...
+    'Text', '', ...
+    'Value', true);
 
 tablePanel = uipanel(mainGrid, 'Title', 'Datasets');
 tablePanel.Layout.Row = 3;
@@ -437,6 +449,7 @@ if isvalid(selectionFig)
     if selectionConfirmed && isempty(selectedIdx)
         selectedIdx = find(selectedMask);
     end
+    overwrite = overwriteCheckbox.Value;
     delete(selectionFig);
 end
 
@@ -825,7 +838,7 @@ end
 
 % --- Parse timestamp -> seconds ---
 t = duration(string(rawData.Time_ms), 'InputFormat', 'hh:mm:ss.SSS');
-tSec = seconds(t);
+tSec = seconds(t) + 0.2;
 
 rawData.TimeSec = round(tSec, 3);
 
@@ -868,6 +881,7 @@ linZ = interp1(tData, linZ, time, 'linear', 'extrap');
 gyrX = interp1(tData, gyrX, time, 'linear', 'extrap');
 gyrY = interp1(tData, gyrY, time, 'linear', 'extrap');
 gyrZ = interp1(tData, gyrZ, time, 'linear', 'extrap');
+
 
 imuData = table(time, linX, linY, linZ, gyrX, gyrY, gyrZ, ...
     'VariableNames', {'Time', 'linX', 'linY', 'linZ', 'gyrX', 'gyrY', 'gyrZ'});
@@ -1616,14 +1630,18 @@ function [beta, all_beta] = get_beta(x, parameters)
     beta = min(beta_vals);
 end
 
-function outDir = make_directory(datetime_string)
+function outDir = make_directory(datetime_string,overwrite)
 
     scriptDir = fileparts(mfilename('fullpath'));
     outDir = fullfile(scriptDir, '..', 'Force_Sensor_Data', datetime_string);
     baseDir = outDir;
     i = 1;
     
-    while exist(outDir, 'dir') 
+    if exist(outDir, 'dir') && overwrite
+        return
+    end
+
+    while exist(outDir, 'dir')
         outDir = sprintf("%s__(%s)", baseDir, string(i)); 
         i = i + 1; 
     end
@@ -1690,6 +1708,7 @@ for j = 1:M
     T.attached(inInterval) = 0;
 end
 
+T = T(21:end-20, :);
 
 outName = 'data.csv';
 outPath = fullfile(outDir, outName);
@@ -1700,7 +1719,7 @@ fprintf('Dataset exported:\n%s\n', outPath);
 
 end
 
-function save_meta_data(folder, filename, selectedRecord,parameters, scriptParameters)
+function save_meta_data(folder, filename, selectedRecord,parameters, scriptParameters,ppdata)
 
 % Record the dataset metadata that was used to produce the export.
 ID = selectedRecord.ID;
@@ -1800,6 +1819,25 @@ for i = 1:nc
 
     fprintf(fid, '\n');
 end
+
+% ===== Post Processing Results =====
+fprintf(fid, '--------------- POST PROCESSING RESULTS ---------------\n');
+fprintf(fid, 'Number of Detachment Events      : %d\n', ppdata.detached_count);
+fprintf(fid, 'True Positive Events             : %d\n', ppdata.true_positive_count);
+fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.true_positive);
+fprintf(fid, '\n');
+
+fprintf(fid, 'Total Attached Duration          : %.6f s\n', ppdata.attached_duration);
+fprintf(fid, 'False Positive Duration          : %.6f s\n', ppdata.false_positive_duration);
+fprintf(fid, 'False Positive Rate              : %.2f %%\n', ...
+    ppdata.false_positive);
+fprintf(fid, '\n');
+
+fprintf(fid, 'Average Optimisation Frequency   : %.2f Hz\n', ...
+    ppdata.average_loop_speed);
+fprintf(fid, 'Average Loop Time                : %.3f ms\n', ...
+    1000 / ppdata.average_loop_speed);
+fprintf(fid, '\n');
 
 % ===== Footer =====
 fprintf(fid, '==================== END OF REPORT ====================\n');
