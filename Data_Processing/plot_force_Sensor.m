@@ -37,7 +37,7 @@ end
 
 displayItems = buildDisplayItems(dataReg);
 infoItems = buildInfoItems(dataReg);
-selectedIdxs = runSelectionDialog(displayItems, infoItems);
+selectedIdxs = runSelectionDialog(displayItems, infoItems, dataReg);
 
 if isempty(selectedIdxs)
     return;
@@ -296,10 +296,10 @@ function infoItems = buildInfoItems(dataReg)
 
 infoItems = strings(height(dataReg), 1);
 
-for k = 1:height(dataReg)
+for rowIdx = 1:height(dataReg)
 
     % Extract date-like prefix from Force Sensor Filename
-    forceFile = string(dataReg.('Force Sensor Filename')(k));
+    forceFile = string(dataReg.('Force Sensor Filename')(rowIdx));
 
     % Assumes format: YYYY-MM-DD_HH-MM-SS_...
     dateToken = extractBefore(forceFile, "_");
@@ -309,86 +309,398 @@ for k = 1:height(dataReg)
     dateText = "Date: " + string(dt, 'dd/MM/yyyy');
 
     % Notes
-    notesText = string(dataReg.Notes(k));
+    notesText = string(dataReg.Notes(rowIdx));
     if strlength(strtrim(notesText)) == 0
         notesText = "Notes: (none)";
     else
         notesText = "Notes: " + notesText;
     end
 
-    infoItems(k) = dateText + " | " + notesText;
+    infoItems(rowIdx) = dateText + " | " + notesText;
 end
 
 end
 
-function selectedIdx = runSelectionDialog(displayItems, infoItems)
-% Multi-selection GUI selector that returns a vector of row indices.
+function selectedIdx = runSelectionDialog(displayItems, infoItems, dataReg)
+% Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
+rowCount = height(dataReg);
+selectedMask = false(rowCount, 1);
+selectionConfirmed = false;
 
-width = 900;
-height = 520;
+filterState = struct( ...
+    'Configuration', "All", ...
+    'Angle', "All", ...
+    'EMConfig', "All");
+
+isUpdatingFilters = false;
 
 selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', ...
-    'Position', [500 400 width height]);
+    'Position', [500 250 1180 760]);
 
-selectionFig.UserData = [];
-
+drawnow;
 selectionFig.CloseRequestFcn = @cancelSelection;
 
-uilabel(selectionFig, ...
-    'Position', [20 height-40 300 30], ...
-    'Text', 'Select Dataset(s):', ...
-    'FontSize', 14);
+mainGrid = uigridlayout(selectionFig, [4 1]);
+mainGrid.Padding = [10 10 10 10];
+mainGrid.RowSpacing = 6;
+mainGrid.RowHeight = {120, 60, '1x', 80};
+controlPanel = uipanel(mainGrid, 'Title', 'Controls');
+controlPanel.Layout.Row = [1 2];
 
-infoLabel = uilabel(selectionFig, ...
-    'Position', [220 height-40 660 30], ...
-    'Text', infoItems(1), ...
-    'FontSize', 12, ...
-    'HorizontalAlignment', 'right');
+mainGridLayout = uigridlayout(controlPanel, [2 1]);
+mainGridLayout.RowHeight = {90, 40};
+mainGridLayout.Padding = [8 8 8 8];
+mainGridLayout.RowSpacing = 10;
 
-% --- MULTI-SELECT TABLE (replaces dropdown) ---
-uitable(selectionFig, ...
-    'Position', [20 80 width-40 height-140], ...
-    'Data', displayItems(:), ...
-    'ColumnName', {'Dataset'}, ...
-    'ColumnEditable', false, ...
-    'CellSelectionCallback', @updateSelection);
+%% ---------------- ACTIONS (bottom row) ----------------
+actionsGrid = uigridlayout(mainGridLayout, [1 4]);
+actionsGrid.Layout.Row = 1;
 
-selectedRows = [];
+actionsGrid.ColumnWidth = {'1x','1x','1x','1x'};
 
-uibutton(selectionFig, 'Text', 'Load Dataset(s)', ...
-    'Position', [340 25 220 34], ...
-    'ButtonPushedFcn', @loadSelection);
+uibutton(actionsGrid, 'Text', 'Select Matching', 'ButtonPushedFcn', @applySelectMatching);
+uibutton(actionsGrid, 'Text', 'Deselect Matching', 'ButtonPushedFcn', @applyDeselectMatching);
+uibutton(actionsGrid, 'Text', 'Clear Selection', 'ButtonPushedFcn', @clearSelection);
+uibutton(actionsGrid, 'Text', 'Select All', 'ButtonPushedFcn', @selectAllRows);
 
-uibutton(selectionFig, 'Text', 'Cancel', ...
-    'Position', [580 25 120 34], ...
+%% ---------------- FILTERS (top row) ----------------
+filterGrid = uigridlayout(mainGridLayout, [1 6]);
+filterGrid.Layout.Row = 2;
+
+filterGrid.ColumnWidth = {130, '1x', 150, '1x', 130, '1x'};
+filterGrid.RowHeight = {24};
+
+uilabel(filterGrid, 'Text', 'Configuration');
+configurationDropDown = uidropdown(filterGrid, ...
+    'Items', {'All', 'flat', 'RA', 'single'}, ...
+    'Value', 'All', ...
+    'ValueChangedFcn', @onFilterChange);
+
+uilabel(filterGrid, 'Text', 'AngleFromGravity');
+angleDropDown = uidropdown(filterGrid, ...
+    'Items', {'All', '0', '90', '180', '90V'}, ...
+    'Value', 'All', ...
+    'ValueChangedFcn', @onFilterChange);
+
+uilabel(filterGrid, 'Text', 'EM Config');
+emDropDown = uidropdown(filterGrid, ...
+    'Items', {'All', 'off', 'on', 'off-off', 'on-on', 'off-on', 'on-off'}, ...
+    'Value', 'All', ...
+    'ValueChangedFcn', @onFilterChange);
+
+
+tablePanel = uipanel(mainGrid, 'Title', 'Datasets');
+tablePanel.Layout.Row = 3;
+tableGrid = uigridlayout(tablePanel, [1 1]);
+tableGrid.Padding = [0 0 0 0];
+
+selectionTable = uitable(tableGrid, ...
+    'Data', buildSelectionTableData(), ...
+    'ColumnEditable', false(1, 7), ...
+    'CellSelectionCallback', @onTableSelectionChanged);%, ...
+    %'ColumnWidth', {'1x', '1x', '1x', '1x', '1x', '1x', '1x'});
+selectionTable.Layout.Row = 1;
+selectionTable.Layout.Column = 1;
+
+% statusLabel = uilabel(mainGrid, ...
+%     'Text', '', ...
+%     'FontWeight', 'bold');
+% statusLabel.Layout.Row = 4;
+
+footerPanel = uipanel(mainGrid, 'BorderType', 'none');
+footerPanel.Layout.Row = 4;
+footerGrid = uigridlayout(footerPanel, [1 3]);
+footerGrid.ColumnWidth = {'1x','1x','1x'};
+
+
+statusLabel = uilabel(footerGrid, ...
+    'Text', '', ...
+    'FontWeight', 'bold');
+
+uibutton(footerGrid, ...
+    'Text', 'Select', ...
+    'ButtonPushedFcn', @confirmSelection);
+
+uibutton(footerGrid, ...
+    'Text', 'Cancel', ...
     'ButtonPushedFcn', @cancelSelection);
 
+syncFilterOptions();
+refreshTableHighlight();
+
+drawnow;
 uiwait(selectionFig);
 
 if isvalid(selectionFig)
-    selectedIdx = selectionFig.UserData;
+    if selectionConfirmed && isempty(selectedIdx)
+        selectedIdx = find(selectedMask);
+    end
     delete(selectionFig);
 end
 
-    function updateSelection(~, event)
+    function onFilterChange(~, ~)
+        if isUpdatingFilters
+            return;
+        end
+
+        filterState.Configuration = string(configurationDropDown.Value);
+        filterState.Angle = string(angleDropDown.Value);
+        filterState.EMConfig = string(emDropDown.Value);
+
+        syncFilterOptions();
+        refreshStatusText();
+    end
+
+    function syncFilterOptions()
+        isUpdatingFilters = true;
+
+        configValue = string(configurationDropDown.Value);
+        angleItems = buildAngleItems(configValue);
+        emItems = buildEmItems(configValue);
+
+        configurationDropDown.Items = {'All', 'flat', 'RA', 'single'};
+        angleDropDown.Items = cellstr(angleItems);
+        emDropDown.Items = cellstr(emItems);
+
+        configurationDropDown.Value = char(keepOrResetValue(string(configurationDropDown.Value), string(configurationDropDown.Items)));
+        angleDropDown.Value = char(keepOrResetValue(string(angleDropDown.Value), angleItems));
+        emDropDown.Value = char(keepOrResetValue(string(emDropDown.Value), emItems));
+
+        filterState.Configuration = string(configurationDropDown.Value);
+        filterState.Angle = string(angleDropDown.Value);
+        filterState.EMConfig = string(emDropDown.Value);
+
+        isUpdatingFilters = false;
+    end
+
+    function value = keepOrResetValue(currentValue, validItems)
+        validItems = string(validItems);
+
+        if ismember(currentValue, validItems)
+            value = currentValue;
+        else
+            value = validItems(1);
+        end
+    end
+
+    function applySelectMatching(~, ~)
+        matchingMask = computeMatchingMask();
+        selectedMask(matchingMask) = true;
+        refreshTableHighlight();
+    end
+
+    function applyDeselectMatching(~, ~)
+        matchingMask = computeMatchingMask();
+        selectedMask(matchingMask) = false;
+        refreshTableHighlight();
+    end
+
+    function clearSelection(~, ~)
+        selectedMask(:) = false;
+        refreshTableHighlight();
+    end
+
+    function selectAllRows(~, ~)
+        selectedMask(:) = true;
+        refreshTableHighlight();
+    end
+
+    function onTableSelectionChanged(~, event)
         if isempty(event.Indices)
             return;
         end
-        selectedRows = unique(event.Indices(:,1));
-        idx = selectedRows(1);
-        infoLabel.Text = infoItems(idx);
+
+        rows = unique(event.Indices(:,1));
+        rows = rows(rows >= 1 & rows <= rowCount);
+        if isempty(rows)
+            return;
+        end
+
+        selectedMask(rows) = ~selectedMask(rows);
+        refreshTableHighlight();
     end
 
-    function loadSelection(~, ~)
-        selectionFig.UserData = selectedRows;
+    function refreshTableHighlight()
+        selectionTable.Data = buildSelectionTableData();
+        refreshStatusText();
+    end
+
+    function refreshStatusText()
+        matchingMask = computeMatchingMask();
+        statusLabel.Text = sprintf('%d of %d rows selected | %d rows match current filters', ...
+            nnz(selectedMask), rowCount, nnz(matchingMask));
+    end
+
+    function matchingMask = computeMatchingMask()
+        matchingMask = false(rowCount, 1);
+
+        for rowIdx = 1:rowCount
+            matchingMask(rowIdx) = matchesFilter(dataReg(rowIdx, :), filterState);
+        end
+    end
+
+    function selectionTableData = buildSelectionTableData()
+        selectionTableData = table();
+        selectionTableData.Selected = selectedMask;
+        selectionTableData.ID = getRowValue(dataReg, 'ID');
+        selectionTableData.Dataset = displayItems(:);
+        selectionTableData.Info = infoItems(:);
+        selectionTableData.Configuration = normalizeRowText(getRowValue(dataReg, {'Configuration'}));
+        selectionTableData.AngleFromGravity = normalizeAngleColumn(getRowValue(dataReg, {'Angle from Gravity', 'AngleFromGravity'}));
+        selectionTableData.EMConfig = normalizeRowText(getRowValue(dataReg, {'EM Config', 'EMConfig'}));
+    end
+
+    function valueColumn = getRowValue(sourceTable, candidateNames)
+        valueColumn = strings(rowCount, 1);
+
+        if ischar(candidateNames) || isstring(candidateNames)
+            candidateNames = cellstr(candidateNames);
+        end
+
+        matchedName = '';
+        sourceNames = sourceTable.Properties.VariableNames;
+        for candidateIdx = 1:numel(candidateNames)
+            matchIdx = find(strcmpi(sourceNames, candidateNames{candidateIdx}), 1, 'first');
+            if ~isempty(matchIdx)
+                matchedName = sourceNames{matchIdx};
+                break;
+            end
+        end
+
+        if isempty(matchedName)
+            return;
+        end
+
+        rawValue = sourceTable.(matchedName);
+        if istable(rawValue)
+            rawValue = table2array(rawValue);
+        end
+
+        for rowIdx = 1:rowCount
+            valueColumn(rowIdx) = string(rawValue(rowIdx));
+        end
+    end
+
+    function textValue = normalizeRowText(textValue)
+        textValue = strip(string(textValue));
+    end
+
+    function angleValue = normalizeAngleColumn(angleColumn)
+        angleValue = strip(string(angleColumn));
+        angleValue(lower(angleValue) == "90v") = "90V";
+    end
+
+    function tf = matchesFilter(row, filters)
+        tf = true;
+
+        rowConfig = lower(normalizeRowText(getSingleRowValue(row, {'Configuration'})));
+        rowAngle = normalizeAngleText(getSingleRowValue(row, {'Angle from Gravity', 'AngleFromGravity'}), rowConfig);
+        rowEm = lower(normalizeRowText(getSingleRowValue(row, {'EM Config', 'EMConfig'})));
+
+        if filters.Configuration ~= "All"
+            tf = tf && rowConfig == lower(filters.Configuration);
+        end
+
+        if filters.Angle ~= "All"
+            tf = tf && angleMatches(rowAngle, rowConfig, filters.Angle);
+        end
+
+        if filters.EMConfig ~= "All"
+            tf = tf && emMatches(rowEm, filters.EMConfig);
+        end
+    end
+
+    function rowValue = getSingleRowValue(row, candidateNames)
+        rowValue = "";
+        sourceNames = row.Properties.VariableNames;
+        if ischar(candidateNames) || isstring(candidateNames)
+            candidateNames = cellstr(candidateNames);
+        end
+
+        for candidateIdx = 1:numel(candidateNames)
+            matchIdx = find(strcmpi(sourceNames, candidateNames{candidateIdx}), 1, 'first');
+            if ~isempty(matchIdx)
+                rowValue = string(row.(sourceNames{matchIdx}));
+                return;
+            end
+        end
+    end
+
+    function angleValue = normalizeAngleText(rawAngle, rowConfig)
+        angleValue = upper(strip(string(rawAngle)));
+
+        if angleValue == "90V"
+            return;
+        end
+
+        if isnan(str2double(angleValue))
+            angleValue = "";
+            return;
+        end
+
+        angleValue = string(str2double(angleValue));
+
+        if rowConfig == "flat" && angleValue == "90"
+            angleValue = "90";
+        end
+    end
+
+    function tf = angleMatches(rowAngle, rowConfig, filterAngle)
+        filterAngle = string(filterAngle);
+        if filterAngle == "90V"
+            tf = rowConfig == "flat" && rowAngle == "90V";
+        else
+            tf = rowAngle == filterAngle;
+        end
+    end
+
+    function angleItems = buildAngleItems(configValue)
+        configValue = lower(string(configValue));
+        if configValue == "flat"
+            angleItems = {'All', '0', '90', '180', '90V'};
+        else
+            angleItems = {'All', '0', '90', '180'};
+        end
+    end
+
+    function emItems = buildEmItems(configValue)
+        configValue = lower(string(configValue));
+        if configValue == "single"
+            emItems = {'All', 'off', 'on'};
+        else
+            emItems = {'All', 'off', 'on', 'off-on', 'on-off'};
+        end
+    end
+    
+    function confirmSelection(~, ~)
+        selectionConfirmed = true;
+        selectedIdx = find(selectedMask);
         uiresume(selectionFig);
     end
 
     function cancelSelection(~, ~)
-        selectionFig.UserData = [];
+        selectionConfirmed = false;
+        selectedIdx = [];
         uiresume(selectionFig);
+    end
+
+    function tf = emMatches(rowEm, filterEm)
+
+        rowEm = lower(string(rowEm));
+        filterEm = lower(string(filterEm));
+
+        switch filterEm
+            case "on"
+                tf = ismember(rowEm, ["on", "on-on"]);
+
+            case "off"
+                tf = ismember(rowEm, ["off", "off-off"]);
+
+            otherwise
+                tf = rowEm == filterEm;
+        end
     end
 end
 
@@ -634,16 +946,16 @@ function [params,timestamps] = find_slips_and_tips(imuData,method)
     startMotionIndex = 0;
     endMotionTime = -inf;
 
-    for k = 1:height(mask)
+    for maskIdx = 1:height(mask)
 
-        t = mask.Time(k);
+        t = mask.Time(maskIdx);
 
         %% ---------------------------
         %% Enter motion
         %% ---------------------------
-        if ~inMotion && motion(k)
+        if ~inMotion && motion(maskIdx)
             inMotion = true;
-            startMotionIndex = k;
+            startMotionIndex = maskIdx;
             endMotionTime = -inf;
             continue
         end
@@ -654,7 +966,7 @@ function [params,timestamps] = find_slips_and_tips(imuData,method)
         if inMotion
 
             % still moving → reset stationary timer
-            if motion(k)
+            if motion(maskIdx)
                 endMotionTime = -inf;
                 continue
             end
