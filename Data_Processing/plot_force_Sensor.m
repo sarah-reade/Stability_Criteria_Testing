@@ -14,7 +14,16 @@ end
 
 try
     % Preserve original CSV column names (including spaces) for direct access.
-    dataReg = readtable(dataRegPath, 'TextType', 'string', 'PreserveVariableNames', true);
+
+    opts = detectImportOptions(dataRegPath, ...
+    'TextType', 'string', ...
+    'VariableNamingRule', 'preserve');
+
+    opts = setvartype(opts, 'Angle from Gravity', 'string');
+
+    dataReg = readtable(dataRegPath, opts);
+
+    summary(dataReg)
 catch ME
     errordlg(sprintf('Failed to read Data_Reg.csv\n\n%s', ME.message), 'File Read Error');
     return;
@@ -22,6 +31,7 @@ end
 
 requiredCols = {'ID', 'Force Sensor Filename', 'IMU Filename', 'Configuration', 'Angle from Gravity', 'EM Config'};
 missingCols = requiredCols(~ismember(requiredCols, dataReg.Properties.VariableNames));
+disp(dataReg.Properties.VariableNames')
 if ~isempty(missingCols)
     errordlg(sprintf('The following required columns are missing:\n\n%s', strjoin(missingCols, ', ')), 'Invalid Registration File');
     return;
