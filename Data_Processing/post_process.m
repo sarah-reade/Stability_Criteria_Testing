@@ -1,8 +1,11 @@
-function ppdata = post_process(data, margin)
+function ppdata = post_process(data, reff,g_margin,w_margin)
 
     %% ---------------- Defaults ----------------
-    if nargin < 2 || isempty(margin)
-        margin = 0;
+    if nargin < 3 || isempty(g_margin)
+        g_margin = 0;
+        w_margin = 2;
+    elseif nargin < 4 || isempty(w_margin)
+        w_margin = 2;
     end
 
     % If input is filepath, load as table
@@ -14,12 +17,9 @@ function ppdata = post_process(data, margin)
 
     %% ---------------- Init outputs ----------------
     ppdata.true_positive = 0;
-    ppdata.false_positive = 0;
     ppdata.detached_count = 0;
     ppdata.true_positive_count = 0;
-    ppdata.attached_duration = 0;
-    ppdata.false_positive_duration = 0;
-    ppdata.average_loop_speed = 0;
+    ppdata.w_margin = 0;
 
     %% ---------------- Extract signals ----------------
     t = data.time;
@@ -35,7 +35,7 @@ function ppdata = post_process(data, margin)
         if attached(i-1) == 1 && attached(i) == 0
             detached_start(end+1) = t(i);
             
-        if any(gamma(max(1,i-3):min(n,i+3)) <= margin)
+        if any(gamma(max(1,i-3):min(n,i+3)) <= g_margin)
             ppdata.true_positive_count = ppdata.true_positive_count + 1;
         end
         
@@ -57,23 +57,72 @@ function ppdata = post_process(data, margin)
         ppdata.true_positive = NaN;
     end
 
-    %% ---------------- Duration calculations ----------------
-
-    % Attached duration: sum time differences when attached == 1
-    dt = diff(t);
-    ppdata.attached_duration = sum(dt(attached(1:end-1) == 1));
-
-    % False positive duration:
-    % ASSUMPTION: gamma <= margin while ATTACHED (bad signal during attachment)
-    fp_mask = (attached == 1) & (gamma <= margin);
-    ppdata.false_positive_duration = sum(dt(fp_mask(1:end-1)));
-
-    if ppdata.attached_duration > 0
-        ppdata.false_positive = ...
-            100* ppdata.false_positive_duration / ppdata.attached_duration;
-    else
-        ppdata.false_positive = NaN;
+    %% ---------------- Calculate required wrench margin ----------------
+    
+    w_margin_values = zeros(ppdata.detached_count,1);
+    
+    for k = 2:ppdata.detached_count-1
+    
+        % Find detachment index
+        detach_idx = find(t == detached_start(k),1);
+    
+        % Find last reattachment before this detachment
+        attach_idx = find(t == detached_end(k-1),1);
+    
+        if isempty(attach_idx)
+            attach_idx = 1;
+        end
+    
+        %% Wrench magnitude at detachment
+    
+        W_detach = norm([ ...
+            data.Fx(detach_idx), ...
+            data.Fy(detach_idx), ...
+            data.Fz(detach_idx), ...
+            data.Taux(detach_idx)/reff, ...
+            data.Tauy(detach_idx)/reff, ...
+            data.Tauz(detach_idx)/reff ]);
+    
+        %% Wrench history over attached interval
+    
+        Fx = data.Fx(attach_idx:detach_idx);
+        Fy = data.Fy(attach_idx:detach_idx);
+        Fz = data.Fz(attach_idx:detach_idx);
+    
+        Tx = data.Taux(attach_idx:detach_idx);
+        Ty = data.Tauy(attach_idx:detach_idx);
+        Tz = data.Tauz(attach_idx:detach_idx);
+    
+        F = vecnorm([Fx Fy Fz],2,2);
+        T = vecnorm([Tx Ty Tz],2,2) / reff;
+    
+        W = sqrt(F.^2 + T.^2);
+    
+        gamma_seg = gamma(attach_idx:detach_idx);
+    
+        %% Identify false-positive region
+    
+        false_positive_samples = gamma_seg <= g_margin;
+    
+        if any(false_positive_samples)
+    
+            % Highest wrench that would still be incorrectly classified
+            W_fp_max = max(W(false_positive_samples));
+    
+            % Margin needed to exclude all false positives
+            w_margin_values(k) = W_fp_max - W_detach;
+    
+        else
+            % No false positives, no margin required
+            w_margin_values(k) = 0;
+        end
+    
     end
+    
+    %% Average required margin
+    ppdata.w_margin = mean(w_margin_values);
+    ppdata.w_margin_values = w_margin_values;
+
 
     %% ---------------- Average loop speed ----------------
     % ASSUMPTION: loop speed = inverse of loopTime

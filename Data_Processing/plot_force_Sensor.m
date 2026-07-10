@@ -20,8 +20,11 @@ try
     'VariableNamingRule', 'preserve');
 
     opts = setvartype(opts, 'Angle from Gravity', 'string');
+    opts = setvartype(opts, 'Notes', 'string');
+    opts = setvaropts(opts, 'Notes', 'TreatAsMissing', {''});
 
     dataReg = readtable(dataRegPath, opts);
+    dataReg.Notes(ismissing(dataReg.Notes)) = "";
 
     summary(dataReg)
 catch ME
@@ -48,7 +51,7 @@ end
 
 displayItems = buildDisplayItems(dataReg);
 infoItems = buildInfoItems(dataReg);
-[overwrite,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+[overwrite,plots,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
 
 if isempty(selectedIdxs)
     return;
@@ -65,10 +68,10 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     if ~isfile(fscsvPath)
         errordlg(sprintf('The selected CSV file does not exist:\n\n%s', fscsvFilename), 'Missing CSV File');
-        return;
+        continue;
     elseif ~isfile(imucsvPath)
         errordlg(sprintf('The selected CSV file does not exist:\n\n%s', imucsvFilename), 'Missing CSV File');
-        return;
+        continue;
     end
     
     try
@@ -76,7 +79,7 @@ for selectionIdx = 1:numel(selectedIdxs)
         [sampleRate, sensorData, csvMeta] = readSensorCsv(fscsvPath);
     catch ME
         errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
-        return;
+        continue;
     end
     
     t = duration(string(sensorData.Time), ...
@@ -112,12 +115,14 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     idx = 1:decFactor:height(sensorData);
     time = time(idx);
-    fx_ds = (fx_s(idx))-fx_s(2);
-    fy_ds = (fy_s(idx))-fy_s(2);
-    fz_ds = -((fz_s(idx))-fz_s(2));
-    tx_ds = tx_s(idx)-tx_s(2);
-    ty_ds = ty_s(idx)-ty_s(2);
-    tz_ds = -(tz_s(idx)-tz_s(2));
+    nZero = 10;
+    fx_ds = fx_s(idx)-mean(fx_s(1:nZero));
+    fy_ds = (fy_s(idx))-mean(fy_s(1:nZero));
+    fz_ds = -((fz_s(idx))-mean(fz_s(1:nZero)));
+    tx_ds = tx_s(idx)-mean(tx_s(1:nZero));
+    ty_ds = ty_s(idx)-mean(ty_s(1:nZero));
+    tz_ds = -(tz_s(idx)-mean(tz_s(1:nZero)));
+
     
     % Effective sample rate after decimation (used for derivative scaling).
     sampleRate = sampleRate / decFactor;
@@ -208,7 +213,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     export_sensor_dataset_csv( outDir, ...
        time,wrenchData,imuData,variables,beta,motionTimepoints,loop_time);
     
-    ppdata = post_process(outDir+"/data.csv");
+    ppdata = post_process(outDir+"/data.csv",parameters.reff,10,10);
 
     save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters,ppdata)
     
@@ -221,7 +226,11 @@ for selectionIdx = 1:numel(selectedIdxs)
     endIdx   = find(d == -1);
     
     negSegments = [startIdx, endIdx];
-    negTimeSegments = [time(negSegments(:,1)), time(negSegments(:,2))];
+    if ~isempty(negSegments) && all(negSegments(:) >= 1)
+        negTimeSegments = [time(negSegments(:,1)), time(negSegments(:,2))];
+    else
+        negTimeSegments = [];
+    end
     
     ax = nexttile;
     hold(ax,"on");
@@ -265,8 +274,10 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     savefig(fig2, fullfile(outDir, "fig2.fig"));
     print(fig2, fullfile(outDir, "fig2.svg"), "-dsvg");
-
-    close all;
+    
+    if ~plots
+        close all;
+    end
     
 end
 
@@ -337,7 +348,7 @@ end
 
 end
 
-function [overwrite,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,plots,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
@@ -383,10 +394,10 @@ uibutton(actionsGrid, 'Text', 'Clear Selection', 'ButtonPushedFcn', @clearSelect
 uibutton(actionsGrid, 'Text', 'Select All', 'ButtonPushedFcn', @selectAllRows);
 
 %% ---------------- FILTERS (top row) ----------------
-filterGrid = uigridlayout(mainGridLayout, [1 8]);
+filterGrid = uigridlayout(mainGridLayout, [1 10]);
 filterGrid.Layout.Row = 2;
 
-filterGrid.ColumnWidth = {100, '1x', 100, '1x', 100, '1x',150, 40};
+filterGrid.ColumnWidth = {100, '1x', 100, '1x', 100, '1x',150, 40, 40,40};
 filterGrid.RowHeight = {24};
 
 uilabel(filterGrid, 'Text', 'Configuration');
@@ -412,6 +423,12 @@ uilabel(filterGrid, ...
 overwriteCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
     'Value', true);
+
+uilabel(filterGrid, ...
+    'Text', sprintf('Plot?'));
+plotsCheckbox = uicheckbox(filterGrid, ...
+    'Text', '', ...
+    'Value', false);
 
 tablePanel = uipanel(mainGrid, 'Title', 'Datasets');
 tablePanel.Layout.Row = 3;
@@ -460,6 +477,7 @@ if isvalid(selectionFig)
         selectedIdx = find(selectedMask);
     end
     overwrite = overwriteCheckbox.Value;
+    plots = plotsCheckbox.Value;
     delete(selectionFig);
 end
 
@@ -1166,9 +1184,9 @@ function parameters = get_params(config,angle,emconfig)
 
     parameters.mu = 1.0;
     r = 0.077;
-    parameters.r_x = r/6;
-    parameters.r_y = r/18;
-    parameters.reff = r;
+    parameters.r_x = r/8;
+    parameters.r_y = r/8;
+    parameters.reff = r*10;
 
     m_em = 0.4;
     m_pm = 0.002*19;
@@ -1303,7 +1321,7 @@ function parameters = get_params(config,angle,emconfig)
         g = rotateVector(g_base,pi/2,'x');
         g = rotateVector(g,deg2rad(-130),'z'); % rotate to match sensor frame in x and y
     else
-        g = g_base;
+        g = reshape(g_base,3,1);
     end 
     
     % Append the rotational components expected by the wrench transform.
@@ -1373,7 +1391,7 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % Linear inequality
     % -----------------------------
 
-    nrow = 4 * nc;
+    nrow = 5 * nc;
     ncol = 6 * nc + 1;
     
     A = zeros(nrow, ncol);
@@ -1382,7 +1400,7 @@ function [x,beta] = solveSOCP(parameters, wrench)
 
     for i = 1:nc
         cols = (6*(i-1)+1):(6*i);
-        rows = (4*(i-1)+1):(4*i);
+        rows = (5*(i-1)+1):(5*i);
     
         % z component (always 1)
         A(rows, cols(3)) = -1;
@@ -1390,13 +1408,13 @@ function [x,beta] = solveSOCP(parameters, wrench)
         % angular x/y contributions
         A(rows(1:2), cols(4)) = [ 2/r_x; -2/r_x ];
         A(rows(3:4), cols(5)) = [ 2/r_y; -2/r_y ];
-    
+
         % last column = 1
         A(rows, end) = 1;
 
-        b = [b; Fa(i) * ones(4,1)];
+        b = [b; Fa(i) * ones(5,1)];
     end
-
+    
     % -----------------------------
     % SOC inequalities
     % -----------------------------
@@ -1425,9 +1443,16 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % -----------------------------
     % Solve
     % -----------------------------
-    lb = ones(1,6*nc+1)*-Inf;
-    ub = ones(1,6*nc+1)*Inf;
-    [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub);
+    lb = ones(1,6*nc+1)*-1000;
+    ub = ones(1,6*nc+1)*1000;
+    opts = optimoptions('coneprog', ...
+        'ConstraintTolerance', 1e-6, ...
+        'Display', 'final', ...
+        'LinearSolver', 'auto', ...
+        'MaxIterations', 500, ...
+        'MaxTime', Inf, ...
+        'OptimalityTolerance', 1e-6);
+    [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub,opts);
     beta = -beta;
 
     %displaySOCPConstraints(x, parameters, wrench);
@@ -1837,10 +1862,9 @@ fprintf(fid, 'True Positive Events             : %d\n', ppdata.true_positive_cou
 fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.true_positive);
 fprintf(fid, '\n');
 
-fprintf(fid, 'Total Attached Duration          : %.6f s\n', ppdata.attached_duration);
-fprintf(fid, 'False Positive Duration          : %.6f s\n', ppdata.false_positive_duration);
-fprintf(fid, 'False Positive Rate              : %.2f %%\n', ...
-    ppdata.false_positive);
+fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.w_margin);
+fprintf(fid, 'W Margin Values                 : ');
+fprintf(fid, '%.6f ', ppdata.w_margin_values);
 fprintf(fid, '\n');
 
 fprintf(fid, 'Average Optimisation Frequency   : %.2f Hz\n', ...
