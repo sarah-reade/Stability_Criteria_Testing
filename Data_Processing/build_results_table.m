@@ -1,0 +1,213 @@
+function outputTable = build_results_table(rootDir)
+% Builds dataset + provides filtering + aggregation utilities
+
+if nargin < 1
+    rootDir = fullfile(pwd, 'Force_Sensor_Data');
+end
+
+files = dir(fullfile(rootDir, '*', 'metaData.txt'));
+
+% =========================
+% STORAGE
+% =========================
+layout = {};
+angle = {};
+em = {};
+lt = {};
+
+true_positive = [];
+detached_count = [];
+true_positive_count = [];
+
+w_margin = [];
+w_margin_std = [];
+
+% =========================
+% PARSE FILES
+% =========================
+for i = 1:numel(files)
+
+    filePath = fullfile(files(i).folder, files(i).name);
+    txt = fileread(filePath);
+
+    c = extractValue(txt,'Configuration');
+    a = extractValue(txt,'Angle from Gravity');
+    e = extractValue(txt,'EM Configuration');
+    loop_time = extractValue(txt,'Average Loop Time');
+
+
+    tp = extractNumeric(txt,'True Positive Rate');
+    dc = extractNumeric(txt,'Number of Detachment Events');
+    tpc = extractNumeric(txt,'True Positive Events');
+
+    wm = extractNumeric(txt,'Mean W Margin');
+    wms = extractNumeric(txt,'W Margin STDDEV');
+
+
+    if isempty(c) || isempty(a) || isempty(e)
+        continue
+    end
+
+
+    layout{end+1,1} = c;
+    angle{end+1,1} = a;       % keep raw angle
+    em{end+1,1} = e;          % keep raw EM
+    lt{end+1,1} = loop_time;
+
+
+    true_positive(end+1,1) = tp;
+    detached_count(end+1,1) = dc;
+    true_positive_count(end+1,1) = tpc;
+
+    w_margin(end+1,1) = wm;
+    w_margin_std(end+1,1) = wms;
+end
+
+% =========================
+% RAW TABLE
+% =========================
+rawTable = table(layout, angle, em, true_positive,detached_count,true_positive_count,w_margin, w_margin_std, lt, ...
+    'VariableNames', {'Configuration','Angle','EM_Config', ...
+                      'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+
+% =========================
+% AGGREGATE
+% =========================
+outputTable = aggregateGroups(rawTable);
+
+end
+
+
+function outputTable = aggregateGroups(rawTable)
+
+    % change all on-on to on and off-off to off
+    rawTable.EM_Config(strcmp(rawTable.EM_Config, 'on-on')) = {'on'};
+    rawTable.EM_Config(strcmp(rawTable.EM_Config, 'off-off')) = {'off'};
+
+    %% generate list of different configs
+    layouts = getUnique(rawTable.Configuration);
+    angles  = getUnique(rawTable.Angle);
+    em      = getUnique(rawTable.EM_Config);
+
+    %% create all combinations
+    [L, A, E] = ndgrid(layouts, angles, em);
+
+    outputTable = table(L(:), A(:), E(:), ...
+                        'VariableNames', {'Configuration','Angle','EM_Config'});
+    outputTableData = table('Size',[0 6], ...
+    'VariableTypes',{'double','double','double','double','double','double'}, ...
+    'VariableNames',{'TruePositiveRate','DetachmentCount','TruePositiveCount',...
+                     'WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+
+    %% loop all raw data and aggregate information
+    for i = 1:size(outputTable,1)
+        % config is all the check if em are all, then check if 
+        mask = getMask(rawTable,outputTable.Configuration(i),outputTable.Angle(i),outputTable.EM_Config(i));
+        outputTableData(i,:) = combineResults(rawTable,mask);
+    end
+
+    outputTable = [outputTable,outputTableData];
+
+end
+
+function output = getUnique(input)
+    values = string(unique(input));
+
+    if numel(values) > 1
+        output = ["all"; values];
+    else
+        output = values;
+    end
+end
+
+function mask = getMask(data,layout,angle,em_config)
+    mask = true(height(data),1);
+
+    if layout ~= "all"
+        mask = mask & data.Configuration == layout;
+    end
+
+    if angle ~= "all"
+        mask = mask & data.Angle == angle;
+    end
+
+    if em_config ~= "all"
+        mask = mask & data.EM_Config == em_config;
+    end
+
+end
+
+function output = combineResults(data,mask)
+
+    if nargin < 2 || any(isnan(mask))
+        mask = ones(length(data));
+    end
+
+    if all(mask == 0)
+        output = data(NaN, NaN, NaN, NaN, NaN, NaN, ...
+                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+        return;
+    end
+
+    % mask data
+    data = data(mask,:);
+
+    % calculate the results
+    detach_count = sum(data.DetachmentCount);
+    true_positive_count = sum(data.TruePositiveCount);
+    if detach_count ~= 0
+        true_positive_rate = 100*true_positive_count/detach_count;
+    else
+        true_positive_rate = NaN;
+    end
+
+    w_margin_sum = 0;
+    w_margin_std_sum = 0;
+    for i = 1:height(data)
+        w_margin_sum = w_margin_sum + data.WrenchMargin(i)*(data.DetachmentCount(i)-1);
+        w_margin_std_sum = w_margin_std_sum + (data.WrenchMarginStd(i)^2)*(data.DetachmentCount(i)-2);
+    end
+
+    if detach_count-height(data) ~= 0
+        w_margin = w_margin_sum/(detach_count-height(data));
+        if detach_count-2*height(data) ~= 0
+            w_margin_std = sqrt(w_margin_std_sum/(detach_count-2*height(data)));
+        else
+            w_margin_std = NaN;
+        end
+    else
+        w_margin = NaN;
+        w_margin_std = NaN;
+    end
+
+    loop_time = sum(str2double(erase(string(data.LoopTime_ms), " ms")))/height(data);
+    
+
+    output = table(true_positive_rate, detach_count, true_positive_count, w_margin, w_margin_std, loop_time, ...
+                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+    
+
+end
+
+% =========================================================
+% PARSERS
+% =========================================================
+function val = extractValue(txt, key)
+expr = [key '\s*:\s*([^\n\r%]+)'];
+tok = regexp(txt, expr, 'tokens', 'once');
+if isempty(tok)
+    val = '';
+else
+    val = strtrim(tok{1});
+end
+end
+
+function num = extractNumeric(txt, key)
+expr = [key '\s*:\s*([-+]?\d*\.?\d+|NaN)'];
+tok = regexp(txt, expr, 'tokens', 'once');
+if isempty(tok)
+    num = NaN;
+else
+    num = str2double(tok{1});
+end
+end

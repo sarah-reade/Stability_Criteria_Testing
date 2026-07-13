@@ -121,7 +121,7 @@ function ppdata = post_process(data, reff,g_margin,w_margin)
     
     %% Average required margin
     ppdata.w_margin = mean(w_margin_values);
-    ppdata.w_margin_values = w_margin_values;
+    ppdata.w_margin_std = std(w_margin_values);
 
 
     %% ---------------- Average loop speed ----------------

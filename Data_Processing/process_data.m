@@ -57,6 +57,7 @@ if isempty(selectedIdxs)
     return;
 end
 
+
 for selectionIdx = 1:numel(selectedIdxs)
 
     selectedIdx = selectedIdxs(selectionIdx);   % force scalar index
@@ -281,6 +282,9 @@ for selectionIdx = 1:numel(selectedIdxs)
     end
     
 end
+
+results = build_results_table(dataDir);
+displayTableAndSaveCSV(results);
 
 end
 
@@ -1864,13 +1868,14 @@ end
 % ===== Post Processing Results =====
 fprintf(fid, '--------------- POST PROCESSING RESULTS ---------------\n');
 fprintf(fid, 'Number of Detachment Events      : %d\n', ppdata.detached_count);
+fprintf(fid, '\n');
 fprintf(fid, 'True Positive Events             : %d\n', ppdata.true_positive_count);
 fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.true_positive);
 fprintf(fid, '\n');
 
 fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.w_margin);
-fprintf(fid, 'W Margin Values                 : ');
-fprintf(fid, '%.6f ', ppdata.w_margin_values);
+fprintf(fid, 'W Margin STDDEV                 : ');
+fprintf(fid, '%.6f %%\n', ppdata.w_margin_std);
 fprintf(fid, '\n');
 
 fprintf(fid, 'Average Optimisation Frequency   : %.2f Hz\n', ...
@@ -1887,4 +1892,43 @@ fclose(fid);
 
 % ===== Optional confirmation =====
 fprintf('Report written to: %s\n', fullpath);
+end
+
+
+function displayTableAndSaveCSV(inputTable)
+
+    % Create UI window
+    fig = uifigure('Name', 'Table Viewer', ...
+                   'Position', [100 100 800 500]);
+
+    % Display table
+    uit = uitable(fig, ...
+                  'Data', inputTable, ...
+                  'Position', [20 70 760 400]);
+
+    % Add save button
+    btn = uibutton(fig, ...
+                   'Text', 'Save CSV', ...
+                   'Position', [20 20 100 30], ...
+                   'ButtonPushedFcn', @(src,event) saveCSV(inputTable));
+
+end
+
+
+function saveCSV(inputTable)
+
+    % Ask user where to save
+    [file, path] = uiputfile('*.csv', 'Save Table As');
+
+    % User cancelled
+    if isequal(file,0)
+        return
+    end
+
+    % Save table
+    writetable(inputTable, fullfile(path,file));
+
+    % Confirmation
+    uialert(gcf, 'Table saved successfully.', 'Saved');
+
 end
