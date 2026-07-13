@@ -1,4 +1,4 @@
-function plot_force_Sensor()
+function process_data()
 %PLOT_FORCE_SENSOR Select a registered force sensor dataset and plot it.
 
 % Resolve data paths relative to this script so the function is portable.
@@ -209,16 +209,17 @@ for selectionIdx = 1:numel(selectedIdxs)
     datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
     outDir = make_directory(datetime_string,overwrite);
     
+    gamma_out = gamma_cnstr;
+    margin = 0;
+    isNeg = gamma_out < margin;
     
     export_sensor_dataset_csv( outDir, ...
-       time,wrenchData,imuData,variables,beta,motionTimepoints,loop_time);
+       time,wrenchData,imuData,variables,gamma_out,motionTimepoints,loop_time);
     
     ppdata = post_process(outDir+"/data.csv",parameters.reff,10,10);
 
     save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters,ppdata)
     
-    
-    isNeg = beta < 50;
     
     % Find rising/falling edges
     d = diff([false; isNeg; false]);
@@ -240,7 +241,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     plot(ax, time, beta, 'LineWidth', 1.5);
     xlabel(ax, 'Time (s)');
     ylabel(ax, 'value');
-    title(ax, 'gamma_cnstr', 'Interpreter', 'none');
+    title(ax, 'gamma', 'Interpreter', 'none');
     plot_background(ax,negTimeSegments);
     % legend(ax, {'gamma', 'beta'}, 'Location', 'best');
     
@@ -1372,7 +1373,12 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % for i = 1:nc
     %     f((i-1)*6+3) = -1; % maximise normal forces
     % end
-    f = zeros(6*nc+1,1);
+    %f = zeros(6*nc+1,1);
+    %f(end) = -1;
+    f = ones(6*nc+1,1);
+    for i = 1:nc
+        f((i-1)*6+3) = -1;
+    end
     f(end) = -1;
     
     % -----------------------------
