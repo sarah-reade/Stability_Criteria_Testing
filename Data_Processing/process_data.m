@@ -210,7 +210,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
     outDir = make_directory(datetime_string,overwrite);
     
-    gamma_out = gamma_cnstr;
+    gamma_out = beta;
     margin = 0;
     isNeg = gamma_out < margin;
     
@@ -1377,13 +1377,13 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % for i = 1:nc
     %     f((i-1)*6+3) = -1; % maximise normal forces
     % end
-    %f = zeros(6*nc+1,1);
-    %f(end) = -1;
-    f = ones(6*nc+1,1);
+    f = zeros(6*nc+1,1);
+    f(end) = -1;
+    % f = ones(6*nc+1,1);
     for i = 1:nc
         f((i-1)*6+3) = -1;
     end
-    f(end) = -1;
+    % f(end) = -1;
     
     % -----------------------------
     % Linear equality
@@ -1453,8 +1453,8 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % -----------------------------
     % Solve
     % -----------------------------
-    lb = ones(1,6*nc+1)*-1000;
-    ub = ones(1,6*nc+1)*1000;
+    lb = ones(1,6*nc+1)*-10000;
+    ub = ones(1,6*nc+1)*10000;
     opts = optimoptions('coneprog', ...
         'ConstraintTolerance', 1e-6, ...
         'Display', 'final', ...
@@ -1462,6 +1462,39 @@ function [x,beta] = solveSOCP(parameters, wrench)
         'MaxIterations', 500, ...
         'MaxTime', Inf, ...
         'OptimalityTolerance', 1e-6);
+
+    %% Display coneprog inputs
+    % disp('========== coneprog INPUTS ==========');
+
+    % disp('f =');
+    % disp(f);
+
+    % disp('socConstraints =');
+    % disp(socConstraints);
+
+    % disp('A =');
+    % disp(A);
+
+    % disp('b =');
+    % disp(b);
+
+    % disp('Aeq =');
+    % disp(Aeq);
+
+    % disp('beq =');
+    % disp(beq);
+
+    % disp('lb =');
+    % disp(lb);
+
+    % disp('ub =');
+    % disp(ub);
+
+    % disp('opts =');
+    % disp(opts);
+
+    % disp('=====================================');
+
     [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub,opts);
     beta = -beta;
 

@@ -144,7 +144,7 @@ function output = combineResults(data,mask)
     end
 
     if all(mask == 0)
-        output = data(NaN, NaN, NaN, NaN, NaN, NaN, ...
+        output = table(NaN, NaN, NaN, NaN, NaN, NaN, ...
                     'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
         return;
     end
