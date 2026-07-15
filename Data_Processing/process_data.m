@@ -1207,7 +1207,7 @@ function parameters = get_params(config,angle,emconfig)
     c = 1.0;
     p_magnet = 450;
     em_magnet = 1400;
-    steel_s = 1.0;
+    steel_s = 0.1;
     if ismember(config, {'flat','RA'})
         % Contact confidence
         parameters.c = [c,c]; % Account for lack of coverage
@@ -1335,7 +1335,7 @@ function parameters = get_params(config,angle,emconfig)
     parameters.gravity = Gg*g.';
 
     %print_parameters(parameters);
-    
+    parameters.m = parameters.m*1.5;
     
 end
 
