@@ -1,0 +1,57 @@
+==================== SYSTEM REPORT ====================
+
+ID: 24
+Number of Contacts: 1
+Configuration: single
+EM Configuration: on
+Angle from Gravity: 180
+Processed Time: 15/07/2026 14:41:03
+Notes: 
+
+Force Sensor Filename: 2026-07-15_14-32-55_FT47397.csv
+
+IMU Filename: 20260715_143254_IMULog.csv
+
+---------------- SCRIPT PARAMETERS -----------------
+hz    : 10.000000
+---------- IMU Thresholds:
+linThreshold      : 1.0000000000
+gyrThreshold      : 0.0600000000
+refractoryPeriod  : 0.8000000000
+-------------- OPTIMISATION PARAMETERS ------------
+mu     : 1.000000
+r_x    : 0.009625
+r_y    : 0.009625
+r_eff  : 0.770000
+mass   : 1.078000
+
+-------------------- CONTACT DATA --------------------
+
+CONTACT 1
+-----------------------------------------------------
+f_d     : 1850.000000
+s       : 0.500000
+gravity : 0.000000
+c       : 1.000000
+
+Adjoint Matrix (6x6):
+   1.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+   0.000000   1.000000   0.000000   0.000000   0.000000   0.000000
+   0.000000   0.000000   1.000000   0.000000   0.000000   0.000000
+   0.000000  -0.070533   0.000000   1.000000   0.000000   0.000000
+   0.070533   0.000000   0.000000   0.000000   1.000000   0.000000
+   0.000000   0.000000   0.000000   0.000000   0.000000   1.000000
+
+--------------- POST PROCESSING RESULTS ---------------
+Number of Detachment Events      : 10
+
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
+
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
+
+Average Optimisation Frequency   : 812.19 Hz
+Average Loop Time                : 1.231 ms
+
+==================== END OF REPORT ====================

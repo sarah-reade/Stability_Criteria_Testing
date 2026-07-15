@@ -1,0 +1,7 @@
+Start Time: 15/07/2026 12:05:23
+RDT Sample Rate: 100
+Force Units: N
+Counts per Unit Force: 1000000
+Torque Units: Nm
+Counts per Unit Torque: 1000000
+Status (hex), RDTSequence, F/T Sequence, Fx , Fy , Fz , Tx , Ty , Tz , Time 
