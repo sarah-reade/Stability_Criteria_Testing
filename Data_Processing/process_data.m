@@ -35,7 +35,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     try
         % Parse sample rate, sensor channels, and metadata from selected CSV.
         targetRate = 10; % desired display rate (Hz)
-        [sampleRate, sensorData, csvMeta] = readFilterSensorCsv(fscsvPath,targetRate);
+        [sampleRate, wrenchData, csvMeta] = readFilterSensorCsv(fscsvPath,targetRate);
     catch ME
         msg = sprintf(['Failed to load Force Sensor CSV:\n\n%s\n\n' ...
                     'Function: %s\nLine: %d'], ...
@@ -44,9 +44,9 @@ for selectionIdx = 1:numel(selectedIdxs)
         continue;
     end
     
-    force = [sensorData.fx_ds, sensorData.fy_ds, sensorData.fz_ds];
-    torque = [sensorData.tx_ds, sensorData.ty_ds, sensorData.tz_ds];
-    time = sensorData.time;
+    force = [wrenchData.fx_ds, wrenchData.fy_ds, wrenchData.fz_ds];
+    torque = [wrenchData.tx_ds, wrenchData.ty_ds, wrenchData.tz_ds];
+    time = wrenchData.time;
 
     % % Force normalization (remove initial offset)
     % force0 = force(1,:);              % [fx0 fy0 fz0]
@@ -58,8 +58,7 @@ for selectionIdx = 1:numel(selectedIdxs)
 
     try
         % Parse sample rate, sensor channels, and metadata from selected CSV.
-        [imuData,imuRawData,scriptParameters,motionTimepoints] = readFilterIMUCsv(imucsvPath,time);
-        scriptParameters.hz = targetRate;
+        [imuData,imuRawData] = readFilterIMUCsv(imucsvPath,time);
     catch ME
         msg = sprintf(['Failed to load IMU CSV:\n\n%s\n\n' ...
                     'Function: %s\nLine: %d'], ...
@@ -69,6 +68,19 @@ for selectionIdx = 1:numel(selectedIdxs)
     end
 
     parameters = getParams(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'),selectedRecord.('Surface'));
+
+    try 
+        [scriptParameters,motionTimepoints] = find_slips_and_tips(imuData,wrenchData,parameters.reff,'mag');
+        scriptParameters.hz = targetRate;
+    catch ME
+        msg = sprintf(['Failed to detect slips and trips:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'Processing Error');
+        continue;
+    end
+
+
 
     wrench = [force,torque];
     gamma_cnstr = zeros(height(wrench),1);

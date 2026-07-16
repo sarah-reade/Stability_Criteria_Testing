@@ -81,11 +81,17 @@ function export_sensor_dataset_csv( outDir, ...
     N = numel(time);
     M = numel(motionTimepoints.Time);
 
-    T.attached = ones(N,1);   % Default to 1 outside motion intervals.
+    T.attached = ones(N,1);   % Default to 1 outside detach intervals.
+    T.fullyattached = ones(N,1);   % Default to 1 outside motion intervals.
 
     for j = 1:M
         inInterval = (time >= motionTimepoints.Time(j)) & ...
                     (time <= motionTimepoints.EndTime(j));
+
+        T.fullyattached(inInterval) = 0;
+
+        inInterval = (time >= motionTimepoints.detachTimestamps.Time(j)) & ...
+                    (time <= motionTimepoints.detachTimestamps.EndTime(j));
 
         T.attached(inInterval) = 0;
     end
@@ -122,6 +128,7 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     hz = scriptParameters.hz;
     imu_linThresh = scriptParameters.linThreshold;
     imu_gyrThresh = scriptParameters.gyrThreshold;
+    imu_wrenchThreshold = scriptParameters.wrenchThreshold;
     imu_refPer = scriptParameters.refractoryPeriod;
 
     % Model parameters used by the SOCP.
@@ -172,6 +179,7 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '---------- IMU Thresholds:\n');
     fprintf(fid, 'linThreshold      : %.10f\n', imu_linThresh);
     fprintf(fid, 'gyrThreshold      : %.10f\n', imu_gyrThresh);
+    fprintf(fid, 'wrenchThreshold      : %.10f\n', imu_wrenchThreshold);
     fprintf(fid, 'refractoryPeriod  : %.10f\n', imu_refPer);
 
     % ===== Global Parameters =====
