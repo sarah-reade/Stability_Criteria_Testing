@@ -26,7 +26,6 @@ function dataReg = getDataReg(dataRegPath)
 
     requiredCols = {'ID', 'Force Sensor Filename', 'IMU Filename', 'Configuration', 'Angle from Gravity','EM Config','Surface'};
     missingCols = requiredCols(~ismember(requiredCols, dataReg.Properties.VariableNames));
-    disp(dataReg.Properties.VariableNames')
     if ~isempty(missingCols)
         errordlg(sprintf('The following required columns are missing:\n\n%s', strjoin(missingCols, ', ')), 'Invalid Registration File');
         return;
