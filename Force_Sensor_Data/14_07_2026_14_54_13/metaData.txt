@@ -4,8 +4,9 @@ ID: 8
 Number of Contacts: 2
 Configuration: flat
 EM Configuration: on-on
+Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 14:26:44
+Processed Time: 16/07/2026 15:19:30
 Notes: loose em cable flip
 
 Force Sensor Filename: 2026-07-14_14-54-13_FT47397.csv
@@ -20,9 +21,9 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
 mass   : 1.998000
 
 -------------------- CONTACT DATA --------------------
@@ -60,13 +61,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 20
 
-True Positive Events             : 5
-True Positive Rate               : 25.00 %
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
 
-Mean W Margin                   : 25.035884
-W Margin STDDEV                 : 31.743299 %
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
 
-Average Optimisation Frequency   : 297.09 Hz
-Average Loop Time                : 3.366 ms
+Average Optimisation Frequency   : 413.16 Hz
+Average Loop Time                : 2.420 ms
 
 ==================== END OF REPORT ====================

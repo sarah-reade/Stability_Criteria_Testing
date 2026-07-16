@@ -3,9 +3,10 @@
 ID: 11
 Number of Contacts: 2
 Configuration: flat
-EM Configuration: off-off
+EM Configuration: on-on
+Surface: shelf
 Angle from Gravity: 90V
-Processed Time: 14/07/2026 15:21:30
+Processed Time: 16/07/2026 15:19:56
 Notes: loose mount and em cable
 
 Force Sensor Filename: 2026-07-14_15-08-32_FT47397.csv
@@ -20,17 +21,17 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
-mass   : 1.332000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
+mass   : 1.998000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 450.000000
-s       : 1.000000
+f_d     : 1850.000000
+s       : 0.100000
 gravity : 7.514896
 c       : 1.000000
 
@@ -44,8 +45,8 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 450.000000
-s       : 1.000000
+f_d     : 1850.000000
+s       : 0.100000
 gravity : -6.305746
 c       : 1.000000
 
@@ -60,13 +61,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 10
 
-True Positive Events             : 5
-True Positive Rate               : 50.00 %
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
 
-Mean W Margin                   : 13.161678
-W Margin STDDEV                 : 21.458443 %
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
 
-Average Optimisation Frequency   : 262.59 Hz
-Average Loop Time                : 3.808 ms
+Average Optimisation Frequency   : 428.88 Hz
+Average Loop Time                : 2.332 ms
 
 ==================== END OF REPORT ====================

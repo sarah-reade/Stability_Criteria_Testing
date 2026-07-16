@@ -4,8 +4,9 @@ ID: 14
 Number of Contacts: 2
 Configuration: RA
 EM Configuration: off-off
+Surface: shelf
 Angle from Gravity: 0
-Processed Time: 15/07/2026 14:39:46
+Processed Time: 16/07/2026 15:20:17
 Notes: bending mount
 
 Force Sensor Filename: 2026-07-15_10-39-14_FT47397.csv
@@ -20,10 +21,10 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
-mass   : 1.407000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
+mass   : 2.110500
 
 -------------------- CONTACT DATA --------------------
 
@@ -45,7 +46,7 @@ Adjoint Matrix (6x6):
 CONTACT 2
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.500000
+s       : 0.100000
 gravity : 0.000000
 c       : 1.000000
 
@@ -60,13 +61,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 23
 
-True Positive Events             : 23
-True Positive Rate               : 100.00 %
+True Positive Events             : 22
+True Positive Rate               : 95.65 %
 
-Mean W Margin                   : 4.175667
-W Margin STDDEV                 : 5.465947 %
+Mean W Margin                   : 4.268579
+W Margin STDDEV                 : 7.511276 %
 
-Average Optimisation Frequency   : 530.89 Hz
-Average Loop Time                : 1.884 ms
+Average Optimisation Frequency   : 378.62 Hz
+Average Loop Time                : 2.641 ms
 
 ==================== END OF REPORT ====================

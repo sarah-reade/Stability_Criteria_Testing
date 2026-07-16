@@ -5,53 +5,10 @@ function process_data()
 scriptDir = fileparts(mfilename('fullpath'));
 dataDir = fullfile(scriptDir, '..', 'Force_Sensor_Data');
 dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
-overwrite = false;
 
-if ~isfile(dataRegPath)
-    errordlg(sprintf('Could not find registration file:\n%s', dataRegPath), 'Registration File Missing');
-    return;
-end
+dataReg = getDataReg(dataRegPath);
 
-try
-    % Preserve original CSV column names (including spaces) for direct access.
-
-    opts = detectImportOptions(dataRegPath, ...
-    'TextType', 'string', ...
-    'VariableNamingRule', 'preserve');
-
-    opts = setvartype(opts, 'Angle from Gravity', 'string');
-    opts = setvartype(opts, 'Notes', 'string');
-    opts = setvaropts(opts, 'Notes', 'TreatAsMissing', {''});
-
-    dataReg = readtable(dataRegPath, opts);
-    dataReg.Notes(ismissing(dataReg.Notes)) = "";
-
-    summary(dataReg)
-catch ME
-    errordlg(sprintf('Failed to read Data_Reg.csv\n\n%s', ME.message), 'File Read Error');
-    return;
-end
-
-requiredCols = {'ID', 'Force Sensor Filename', 'IMU Filename', 'Configuration', 'Angle from Gravity', 'EM Config'};
-missingCols = requiredCols(~ismember(requiredCols, dataReg.Properties.VariableNames));
-disp(dataReg.Properties.VariableNames')
-if ~isempty(missingCols)
-    errordlg(sprintf('The following required columns are missing:\n\n%s', strjoin(missingCols, ', ')), 'Invalid Registration File');
-    return;
-end
-
-% Keep only rows that can be mapped to a dataset and have EM config present.
-validRows = ~ismissing(dataReg.ID) & ~ismissing(dataReg.('Force Sensor Filename')) & strlength(dataReg.('Force Sensor Filename')) > 0 & ~ismissing(dataReg.('IMU Filename')) & strlength(dataReg.('IMU Filename')) > 0 & ~ismissing(dataReg.('EM Config')) & strlength(dataReg.('EM Config')) > 0;
-dataReg = dataReg(validRows, :);
-
-if height(dataReg) == 0
-    errordlg('No valid entries exist in Data_Reg.csv.', 'No Data Available');
-    return;
-end
-
-displayItems = buildDisplayItems(dataReg);
-infoItems = buildInfoItems(dataReg);
-[overwrite,plots,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+[overwrite,clearPlots,selectedIdxs] = runSelectionUi(dataReg);
 
 if isempty(selectedIdxs)
     return;
@@ -77,59 +34,17 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     try
         % Parse sample rate, sensor channels, and metadata from selected CSV.
-        [sampleRate, sensorData, csvMeta] = readSensorCsv(fscsvPath);
+        targetRate = 10; % desired display rate (Hz)
+        [sampleRate, sensorData, csvMeta] = readFilterSensorCsv(fscsvPath,targetRate);
     catch ME
         errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
         continue;
     end
     
-    t = duration(string(sensorData.Time), ...
-        'InputFormat', 'hh:mm:ss.SSS');
     
-    time = seconds(t);
-    
-    % Apply rolling-average smoothing and downsample to approximately 10 Hz.
-    targetRate = 10; % desired display rate (Hz)
-    decFactor = max(1, round(sampleRate / targetRate));
-    
-    % Smooth then downsample each component. Use movmean if available,
-    % otherwise use a convolution fallback for older MATLAB versions.
-    win = decFactor;
-    useMovmean = exist('movmean', 'file') == 2;
-    
-    if useMovmean
-        fx_s = movmean(sensorData.Fx, win);
-        fy_s = movmean(sensorData.Fy, win);
-        fz_s = movmean(sensorData.Fz, win);
-        tx_s = movmean(sensorData.Tx, win);
-        ty_s = movmean(sensorData.Ty, win);
-        tz_s = movmean(sensorData.Tz, win);
-    else
-        kernel = ones(win,1) / win;
-        fx_s = conv(sensorData.Fx, kernel, 'same');
-        fy_s = conv(sensorData.Fy, kernel, 'same');
-        fz_s = conv(sensorData.Fz, kernel, 'same');
-        tx_s = conv(sensorData.Tx, kernel, 'same');
-        ty_s = conv(sensorData.Ty, kernel, 'same');
-        tz_s = conv(sensorData.Tz, kernel, 'same');
-    end
-    
-    idx = 1:decFactor:height(sensorData);
-    time = time(idx);
-    nZero = 10;
-    fx_ds = fx_s(idx)-mean(fx_s(1:nZero));
-    fy_ds = (fy_s(idx))-mean(fy_s(1:nZero));
-    fz_ds = -((fz_s(idx))-mean(fz_s(1:nZero)));
-    tx_ds = tx_s(idx)-mean(tx_s(1:nZero));
-    ty_ds = ty_s(idx)-mean(ty_s(1:nZero));
-    tz_ds = -(tz_s(idx)-mean(tz_s(1:nZero)));
-
-    
-    % Effective sample rate after decimation (used for derivative scaling).
-    sampleRate = sampleRate / decFactor;
-    
-    force = [fx_ds, fy_ds, fz_ds];
-    torque = [tx_ds, ty_ds, tz_ds];
+    force = [sensorData.fx_ds, sensorData.fy_ds, sensorData.fz_ds];
+    torque = [sensorData.tx_ds, sensorData.ty_ds, sensorData.tz_ds];
+    time = sensorData.time;
     
     % % Force normalization (remove initial offset)
     % force0 = force(1,:);              % [fx0 fy0 fz0]
@@ -166,7 +81,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     scriptParameters = params;
     scriptParameters.hz = targetRate;
     
-    wrenchData = table(fx_ds, fy_ds, fz_ds, tx_ds, ty_ds, tz_ds, time, ...
+    wrenchData = table(force(:,1), force(:,2), force(:,3), torque(:,1), torque(:,2), torque(:,3), time, ...
         'VariableNames', {'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
     
     
@@ -190,7 +105,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     
     axs = findall(fig, 'Type', 'axes');
     
-    parameters = get_params(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'));
+    parameters = get_params(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'),selectedRecord.('Surface'));
     
     wrench = [force,torque];
     gamma_cnstr = zeros(height(wrench),1);
@@ -277,7 +192,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     savefig(fig2, fullfile(outDir, "fig2.fig"));
     print(fig2, fullfile(outDir, "fig2.svg"), "-dsvg");
     
-    if ~plots
+    if ~clearPlots
         close all;
     end
     
@@ -309,447 +224,6 @@ function plot_background(ax,negTimeSegments)
     uistack(ax.Children, 'bottom'); % keep shading behind lines
 end
 
-function displayItems = buildDisplayItems(dataReg)
-% Build human-readable labels for the dataset picker.
-displayItems = strings(height(dataReg), 1);
-
-for k = 1:height(dataReg)
-    idText = string(dataReg.ID(k));
-    configText = string(dataReg.Configuration(k));
-    angleText = string(dataReg.('Angle from Gravity')(k));
-    emText = string(dataReg.('EM Config')(k));
-
-    displayItems(k) = sprintf('ID: %s | Configuration: %s | Angle: %s | EM: %s', idText, configText, angleText, emText);
-end
-end
-
-function infoItems = buildInfoItems(dataReg)
-% Build auxiliary info (date + notes) aligned with the dataset picker rows.
-
-infoItems = strings(height(dataReg), 1);
-
-for rowIdx = 1:height(dataReg)
-
-    % Extract date-like prefix from Force Sensor Filename
-    forceFile = string(dataReg.('Force Sensor Filename')(rowIdx));
-
-    % Assumes format: YYYY-MM-DD_HH-MM-SS_...
-    dateToken = extractBefore(forceFile, "_");
-
-    % Convert to datetime and reformat
-    dt = datetime(dateToken, 'InputFormat', 'yyyy-MM-dd');
-    dateText = "Date: " + string(dt, 'dd/MM/yyyy');
-
-    % Notes
-    notesText = string(dataReg.Notes(rowIdx));
-    if strlength(strtrim(notesText)) == 0
-        notesText = "Notes: (none)";
-    else
-        notesText = "Notes: " + notesText;
-    end
-
-    infoItems(rowIdx) = dateText + " | " + notesText;
-end
-
-end
-
-function [overwrite,plots,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
-% Single-figure selector with persistent manual and rule-based selection.
-
-selectedIdx = [];
-overwrite = false;
-rowCount = height(dataReg);
-selectedMask = false(rowCount, 1);
-selectionConfirmed = false;
-
-filterState = struct( ...
-    'Configuration', "All", ...
-    'Angle', "All", ...
-    'EMConfig', "All");
-
-isUpdatingFilters = false;
-
-selectionFig = uifigure('Name', 'Force Sensor Dataset Selection', ...
-    'Position', [500 250 1180 760]);
-
-drawnow;
-selectionFig.CloseRequestFcn = @cancelSelection;
-
-mainGrid = uigridlayout(selectionFig, [4 1]);
-mainGrid.Padding = [10 10 10 10];
-mainGrid.RowSpacing = 6;
-mainGrid.RowHeight = {120, 60, '1x', 80};
-controlPanel = uipanel(mainGrid, 'Title', 'Controls');
-controlPanel.Layout.Row = [1 2];
-
-mainGridLayout = uigridlayout(controlPanel, [2 1]);
-mainGridLayout.RowHeight = {90, 40};
-mainGridLayout.Padding = [8 8 8 8];
-mainGridLayout.RowSpacing = 10;
-
-%% ---------------- ACTIONS (bottom row) ----------------
-actionsGrid = uigridlayout(mainGridLayout, [1 4]);
-actionsGrid.Layout.Row = 1;
-
-actionsGrid.ColumnWidth = {'1x','1x','1x','1x'};
-
-uibutton(actionsGrid, 'Text', 'Select Matching', 'ButtonPushedFcn', @applySelectMatching);
-uibutton(actionsGrid, 'Text', 'Deselect Matching', 'ButtonPushedFcn', @applyDeselectMatching);
-uibutton(actionsGrid, 'Text', 'Clear Selection', 'ButtonPushedFcn', @clearSelection);
-uibutton(actionsGrid, 'Text', 'Select All', 'ButtonPushedFcn', @selectAllRows);
-
-%% ---------------- FILTERS (top row) ----------------
-filterGrid = uigridlayout(mainGridLayout, [1 10]);
-filterGrid.Layout.Row = 2;
-
-filterGrid.ColumnWidth = {100, '1x', 100, '1x', 100, '1x',150, 40, 40,40};
-filterGrid.RowHeight = {24};
-
-uilabel(filterGrid, 'Text', 'Configuration');
-configurationDropDown = uidropdown(filterGrid, ...
-    'Items', {'All', 'flat', 'RA', 'single'}, ...
-    'Value', 'All', ...
-    'ValueChangedFcn', @onFilterChange);
-
-uilabel(filterGrid, 'Text', 'AngleFromGravity');
-angleDropDown = uidropdown(filterGrid, ...
-    'Items', {'All', '0', '90', '180', '90V'}, ...
-    'Value', 'All', ...
-    'ValueChangedFcn', @onFilterChange);
-
-uilabel(filterGrid, 'Text', 'EM Config');
-emDropDown = uidropdown(filterGrid, ...
-    'Items', {'All', 'off', 'on', 'off-off', 'on-on', 'off-on', 'on-off'}, ...
-    'Value', 'All', ...
-    'ValueChangedFcn', @onFilterChange);
-
-uilabel(filterGrid, ...
-    'Text', sprintf('Overwrite Existing Files'));
-overwriteCheckbox = uicheckbox(filterGrid, ...
-    'Text', '', ...
-    'Value', true);
-
-uilabel(filterGrid, ...
-    'Text', sprintf('Plot?'));
-plotsCheckbox = uicheckbox(filterGrid, ...
-    'Text', '', ...
-    'Value', false);
-
-tablePanel = uipanel(mainGrid, 'Title', 'Datasets');
-tablePanel.Layout.Row = 3;
-tableGrid = uigridlayout(tablePanel, [1 1]);
-tableGrid.Padding = [0 0 0 0];
-
-selectionTable = uitable(tableGrid, ...
-    'Data', buildSelectionTableData(), ...
-    'ColumnEditable', false(1, 7), ...
-    'CellSelectionCallback', @onTableSelectionChanged);%, ...
-    %'ColumnWidth', {'1x', '1x', '1x', '1x', '1x', '1x', '1x'});
-selectionTable.Layout.Row = 1;
-selectionTable.Layout.Column = 1;
-
-% statusLabel = uilabel(mainGrid, ...
-%     'Text', '', ...
-%     'FontWeight', 'bold');
-% statusLabel.Layout.Row = 4;
-
-footerPanel = uipanel(mainGrid, 'BorderType', 'none');
-footerPanel.Layout.Row = 4;
-footerGrid = uigridlayout(footerPanel, [1 3]);
-footerGrid.ColumnWidth = {'1x','1x','1x'};
-
-
-statusLabel = uilabel(footerGrid, ...
-    'Text', '', ...
-    'FontWeight', 'bold');
-
-uibutton(footerGrid, ...
-    'Text', 'Select', ...
-    'ButtonPushedFcn', @confirmSelection);
-
-uibutton(footerGrid, ...
-    'Text', 'Cancel', ...
-    'ButtonPushedFcn', @cancelSelection);
-
-syncFilterOptions();
-refreshTableHighlight();
-
-drawnow;
-uiwait(selectionFig);
-
-if isvalid(selectionFig)
-    if selectionConfirmed && isempty(selectedIdx)
-        selectedIdx = find(selectedMask);
-    end
-    overwrite = overwriteCheckbox.Value;
-    plots = plotsCheckbox.Value;
-    delete(selectionFig);
-end
-
-    function onFilterChange(~, ~)
-        if isUpdatingFilters
-            return;
-        end
-
-        filterState.Configuration = string(configurationDropDown.Value);
-        filterState.Angle = string(angleDropDown.Value);
-        filterState.EMConfig = string(emDropDown.Value);
-
-        syncFilterOptions();
-        refreshStatusText();
-    end
-
-    function syncFilterOptions()
-        isUpdatingFilters = true;
-
-        configValue = string(configurationDropDown.Value);
-        angleItems = buildAngleItems(configValue);
-        emItems = buildEmItems(configValue);
-
-        configurationDropDown.Items = {'All', 'flat', 'RA', 'single'};
-        angleDropDown.Items = cellstr(angleItems);
-        emDropDown.Items = cellstr(emItems);
-
-        configurationDropDown.Value = char(keepOrResetValue(string(configurationDropDown.Value), string(configurationDropDown.Items)));
-        angleDropDown.Value = char(keepOrResetValue(string(angleDropDown.Value), angleItems));
-        emDropDown.Value = char(keepOrResetValue(string(emDropDown.Value), emItems));
-
-        filterState.Configuration = string(configurationDropDown.Value);
-        filterState.Angle = string(angleDropDown.Value);
-        filterState.EMConfig = string(emDropDown.Value);
-
-        isUpdatingFilters = false;
-    end
-
-    function value = keepOrResetValue(currentValue, validItems)
-        validItems = string(validItems);
-
-        if ismember(currentValue, validItems)
-            value = currentValue;
-        else
-            value = validItems(1);
-        end
-    end
-
-    function applySelectMatching(~, ~)
-        matchingMask = computeMatchingMask();
-        selectedMask(matchingMask) = true;
-        refreshTableHighlight();
-    end
-
-    function applyDeselectMatching(~, ~)
-        matchingMask = computeMatchingMask();
-        selectedMask(matchingMask) = false;
-        refreshTableHighlight();
-    end
-
-    function clearSelection(~, ~)
-        selectedMask(:) = false;
-        refreshTableHighlight();
-    end
-
-    function selectAllRows(~, ~)
-        selectedMask(:) = true;
-        refreshTableHighlight();
-    end
-
-    function onTableSelectionChanged(~, event)
-        if isempty(event.Indices)
-            return;
-        end
-
-        rows = unique(event.Indices(:,1));
-        rows = rows(rows >= 1 & rows <= rowCount);
-        if isempty(rows)
-            return;
-        end
-
-        selectedMask(rows) = ~selectedMask(rows);
-        refreshTableHighlight();
-    end
-
-    function refreshTableHighlight()
-        selectionTable.Data = buildSelectionTableData();
-        refreshStatusText();
-    end
-
-    function refreshStatusText()
-        matchingMask = computeMatchingMask();
-        statusLabel.Text = sprintf('%d of %d rows selected | %d rows match current filters', ...
-            nnz(selectedMask), rowCount, nnz(matchingMask));
-    end
-
-    function matchingMask = computeMatchingMask()
-        matchingMask = false(rowCount, 1);
-
-        for rowIdx = 1:rowCount
-            matchingMask(rowIdx) = matchesFilter(dataReg(rowIdx, :), filterState);
-        end
-    end
-
-    function selectionTableData = buildSelectionTableData()
-        selectionTableData = table();
-        selectionTableData.Selected = selectedMask;
-        selectionTableData.ID = getRowValue(dataReg, 'ID');
-        selectionTableData.Dataset = displayItems(:);
-        selectionTableData.Info = infoItems(:);
-        selectionTableData.Configuration = normalizeRowText(getRowValue(dataReg, {'Configuration'}));
-        selectionTableData.AngleFromGravity = normalizeAngleColumn(getRowValue(dataReg, {'Angle from Gravity', 'AngleFromGravity'}));
-        selectionTableData.EMConfig = normalizeRowText(getRowValue(dataReg, {'EM Config', 'EMConfig'}));
-    end
-
-    function valueColumn = getRowValue(sourceTable, candidateNames)
-        valueColumn = strings(rowCount, 1);
-
-        if ischar(candidateNames) || isstring(candidateNames)
-            candidateNames = cellstr(candidateNames);
-        end
-
-        matchedName = '';
-        sourceNames = sourceTable.Properties.VariableNames;
-        for candidateIdx = 1:numel(candidateNames)
-            matchIdx = find(strcmpi(sourceNames, candidateNames{candidateIdx}), 1, 'first');
-            if ~isempty(matchIdx)
-                matchedName = sourceNames{matchIdx};
-                break;
-            end
-        end
-
-        if isempty(matchedName)
-            return;
-        end
-
-        rawValue = sourceTable.(matchedName);
-        if istable(rawValue)
-            rawValue = table2array(rawValue);
-        end
-
-        for rowIdx = 1:rowCount
-            valueColumn(rowIdx) = string(rawValue(rowIdx));
-        end
-    end
-
-    function textValue = normalizeRowText(textValue)
-        textValue = strip(string(textValue));
-    end
-
-    function angleValue = normalizeAngleColumn(angleColumn)
-        angleValue = strip(string(angleColumn));
-        angleValue(lower(angleValue) == "90v") = "90V";
-    end
-
-    function tf = matchesFilter(row, filters)
-        tf = true;
-
-        rowConfig = lower(normalizeRowText(getSingleRowValue(row, {'Configuration'})));
-        rowAngle = normalizeAngleText(getSingleRowValue(row, {'Angle from Gravity', 'AngleFromGravity'}), rowConfig);
-        rowEm = lower(normalizeRowText(getSingleRowValue(row, {'EM Config', 'EMConfig'})));
-
-        if filters.Configuration ~= "All"
-            tf = tf && rowConfig == lower(filters.Configuration);
-        end
-
-        if filters.Angle ~= "All"
-            tf = tf && angleMatches(rowAngle, rowConfig, filters.Angle);
-        end
-
-        if filters.EMConfig ~= "All"
-            tf = tf && emMatches(rowEm, filters.EMConfig);
-        end
-    end
-
-    function rowValue = getSingleRowValue(row, candidateNames)
-        rowValue = "";
-        sourceNames = row.Properties.VariableNames;
-        if ischar(candidateNames) || isstring(candidateNames)
-            candidateNames = cellstr(candidateNames);
-        end
-
-        for candidateIdx = 1:numel(candidateNames)
-            matchIdx = find(strcmpi(sourceNames, candidateNames{candidateIdx}), 1, 'first');
-            if ~isempty(matchIdx)
-                rowValue = string(row.(sourceNames{matchIdx}));
-                return;
-            end
-        end
-    end
-
-    function angleValue = normalizeAngleText(rawAngle, rowConfig)
-        angleValue = upper(strip(string(rawAngle)));
-
-        if angleValue == "90V"
-            return;
-        end
-
-        if isnan(str2double(angleValue))
-            angleValue = "";
-            return;
-        end
-
-        angleValue = string(str2double(angleValue));
-
-        if rowConfig == "flat" && angleValue == "90"
-            angleValue = "90";
-        end
-    end
-
-    function tf = angleMatches(rowAngle, rowConfig, filterAngle)
-        filterAngle = string(filterAngle);
-        if filterAngle == "90V"
-            tf = rowConfig == "flat" && rowAngle == "90V";
-        else
-            tf = rowAngle == filterAngle;
-        end
-    end
-
-    function angleItems = buildAngleItems(configValue)
-        configValue = lower(string(configValue));
-        if configValue == "flat"
-            angleItems = {'All', '0', '90', '180', '90V'};
-        else
-            angleItems = {'All', '0', '90', '180'};
-        end
-    end
-
-    function emItems = buildEmItems(configValue)
-        configValue = lower(string(configValue));
-        if configValue == "single"
-            emItems = {'All', 'off', 'on'};
-        else
-            emItems = {'All', 'off', 'on', 'off-on', 'on-off'};
-        end
-    end
-    
-    function confirmSelection(~, ~)
-        selectionConfirmed = true;
-        selectedIdx = find(selectedMask);
-        uiresume(selectionFig);
-    end
-
-    function cancelSelection(~, ~)
-        selectionConfirmed = false;
-        selectedIdx = [];
-        uiresume(selectionFig);
-    end
-
-    function tf = emMatches(rowEm, filterEm)
-
-        rowEm = lower(string(rowEm));
-        filterEm = lower(string(filterEm));
-
-        switch filterEm
-            case "on"
-                tf = ismember(rowEm, ["on", "on-on"]);
-
-            case "off"
-                tf = ismember(rowEm, ["off", "off-off"]);
-
-            otherwise
-                tf = rowEm == filterEm;
-        end
-    end
-end
-
 function infoText = buildInfoBoxString(regRow, csvMeta, sampleRate, sampleCount)
 % Compose metadata shown in the top information panel.
 if ismember('EM Config', regRow.Properties.VariableNames)
@@ -762,6 +236,7 @@ infoText = sprintf([ ...
     'Configuration: %s\n' ...
     'Angle from Gravity: %s\n' ...
     'EM Config: %s\n' ...
+    'Surface: %s\n' ...
     'Start Time: %s\n' ...
     'Sample Rate: %.0f Hz\n' ...
     'Samples: %d\n' ...
@@ -770,6 +245,7 @@ infoText = sprintf([ ...
     char(string(regRow.Configuration)), ...
     char(string(regRow.('Angle from Gravity'))), ...
     emText, ...
+    char(string(regRow.Surface)), ...
     char(csvMeta.startTime), ...
     sampleRate, ...
     sampleCount, ...
@@ -779,82 +255,7 @@ infoText = sprintf([ ...
     char(csvMeta.torqueCountsPerUnit));
 end
 
-function [sampleRate, data, meta] = readSensorCsv(fscsvPath)
-% Read ATI-style CSV: metadata header followed by numeric data rows.
-fileText = fileread(fscsvPath);
-fileLines = splitlines(string(fileText));
 
-sampleRate = 1;
-meta = struct('startTime', "Unknown", 'forceUnits', "Unknown", 'forceCountsPerUnit', "Unknown", 'torqueUnits', "Unknown", 'torqueCountsPerUnit', "Unknown");
-
-rateLineIndex = find(contains(fileLines, 'RDT Sample Rate'), 1, 'first');
-if ~isempty(rateLineIndex)
-    rateMatch = regexp(fileLines(rateLineIndex), 'RDT Sample Rate:\s*([0-9.]+)', 'tokens', 'once');
-    if ~isempty(rateMatch)
-        sampleRate = str2double(rateMatch{1});
-    end
-end
-
-% Pull key metadata fields from header.
-meta.startTime = extractHeaderValue(fileLines, 'Start Time:');
-meta.forceUnits = extractHeaderValue(fileLines, 'Force Units:');
-meta.forceCountsPerUnit = extractHeaderValue(fileLines, 'Counts per Unit Force:');
-meta.torqueUnits = extractHeaderValue(fileLines, 'Torque Units:');
-meta.torqueCountsPerUnit = extractHeaderValue(fileLines, 'Counts per Unit Torque:');
-
-headerLineIndex = find(contains(fileLines, 'Status (hex)'), 1, 'first');
-if isempty(headerLineIndex)
-    error('Could not locate the data header in %s.', fscsvPath);
-end
-
-dataLines = fileLines(headerLineIndex + 1:end);
-dataLines = dataLines(strlength(strtrim(dataLines)) > 0);
-
-status = strings(0, 1);
-rdtSequence = zeros(0, 1);
-ftSequence = zeros(0, 1);
-fx = zeros(0, 1);
-fy = zeros(0, 1);
-fz = zeros(0, 1);
-tx = zeros(0, 1);
-ty = zeros(0, 1);
-tz = zeros(0, 1);
-Time = strings(0, 1);
-
-for i = 1:numel(dataLines)
-    % Data rows are comma-separated and may include trailing empty tokens.
-    parts = strtrim(split(dataLines(i), ','));
-    parts = parts(strlength(parts) > 0);
-
-    if numel(parts) < 10
-        continue;
-    end
-
-    status(end + 1, 1) = parts(1); %#ok<AGROW>
-    rdtSequence(end + 1, 1) = str2double(parts(2)); %#ok<AGROW>
-    ftSequence(end + 1, 1) = str2double(parts(3)); %#ok<AGROW>
-    fx(end + 1, 1) = str2double(parts(4)); %#ok<AGROW>
-    fy(end + 1, 1) = str2double(parts(5)); %#ok<AGROW>
-    fz(end + 1, 1) = str2double(parts(6)); %#ok<AGROW>
-    tx(end + 1, 1) = str2double(parts(7)); %#ok<AGROW>
-    ty(end + 1, 1) = str2double(parts(8)); %#ok<AGROW>
-    tz(end + 1, 1) = str2double(parts(9)); %#ok<AGROW>
-    Time(end + 1, 1) = parts(10); %#ok<AGROW>
-end
-
-data = table(status, rdtSequence, ftSequence, fx, fy, fz, tx, ty, tz, Time, ...
-    'VariableNames', {'Status', 'RDTSequence', 'FTSequence', 'Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz', 'Time'});
-end
-
-function valueText = extractHeaderValue(fileLines, prefixText)
-% Return header value text after `prefixText`, or "Unknown" when missing.
-lineIndex = find(startsWith(fileLines, prefixText), 1, 'first');
-if isempty(lineIndex)
-    valueText = "Unknown";
-else
-    valueText = strtrim(extractAfter(fileLines(lineIndex), prefixText));
-end
-end
 
 function [imuData] = plot_two_sensor_average(rawData, time)
 %PLOT_TWO_SENSOR_AVERAGE Align two IMU sensors by timestamp and average signals.
@@ -1145,7 +546,7 @@ function GMatrix = getGMatrix(trans,rotMat)
             p_hat * rotMat, rotMat];
 end
 
-function parameters = get_params(config,angle,emconfig)
+function parameters = get_params(config,angle,emconfig,surface)
     % Set contact variables that define the optimisation problem.
     % these are different for each configuration and angle to gravity, but include:
     % g The gravity vector relative to the force sensor
@@ -1161,7 +562,7 @@ function parameters = get_params(config,angle,emconfig)
     
     persistent CACHE
 
-    key = sprintf('%s_%s_%s', config, angle, string(emconfig));
+    key = sprintf('%s_%s_%s', config, string(angle), string(emconfig), string(surface));
 
     if isempty(CACHE)
         CACHE = containers.Map;
@@ -1189,9 +590,9 @@ function parameters = get_params(config,angle,emconfig)
 
     parameters.mu = 1.0;
     r = 0.077;
-    parameters.r_x = r;%/8;
-    parameters.r_y = r;%/8;
-    parameters.reff = r;%*10;
+    parameters.r_x = r/2;
+    parameters.r_y = r/2;
+    parameters.reff = r/2;%*10;
 
     m_em = 0.4;
     m_pm = 0.002*19;
@@ -1207,7 +608,13 @@ function parameters = get_params(config,angle,emconfig)
     c = 1.0;
     p_magnet = 450;
     em_magnet = 1400;
-    steel_s = 0.1;
+
+    mag_s = 0.0;
+    if ismember(surface, {'steelbeam'})
+        mag_s = 0.9;
+    elseif ismember(surface, {'shelf'})
+        mag_s = 0.1;
+    end
     if ismember(config, {'flat','RA'})
         % Contact confidence
         parameters.c = [c,c]; % Account for lack of coverage
@@ -1227,7 +634,7 @@ function parameters = get_params(config,angle,emconfig)
         
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [steel_s];
+            parameters.s = [mag_s];
         else
             parameters.s = zeros(1,1);
         end 
@@ -1250,7 +657,7 @@ function parameters = get_params(config,angle,emconfig)
     elseif strcmp(config,'flat')
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [steel_s,steel_s];
+            parameters.s = [mag_s,mag_s];
         else
             parameters.s = zeros(2,1);
         end 
@@ -1283,9 +690,9 @@ function parameters = get_params(config,angle,emconfig)
     elseif strcmp(config,'RA')
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
-            parameters.s = [steel_s,steel_s];
+            parameters.s = [mag_s,mag_s];
         else
-            parameters.s = [0.0,steel_s];
+            parameters.s = [0.0,mag_s];
         end 
         
         % Calculate G_i Wrench Transormation Matrix
@@ -1342,7 +749,7 @@ end
 function [x,beta] = obtain_gamma_cnstr(parameters,wrench)
     
     %% Add Gravity 
-    sensor_wrench = wrench + parameters.gravity;
+    sensor_wrench = wrench + parameters.gravity*parameters.m;
     %%sensor_wrench = wrench;
 
     %% Solve optimisation problem
@@ -1827,6 +1234,7 @@ nc = length(parameters.c);
 
 Configuration = string(selectedRecord.Configuration);      % string
 EM_Configuration = string(selectedRecord.('EM Config'));   % string
+Surface = string(selectedRecord.('Surface'));   % string
 GravityAngle = string(selectedRecord.('Angle from Gravity'));
 
 ProcessedTime = datetime("now");
@@ -1876,6 +1284,7 @@ fprintf(fid, 'ID: %d\n', ID);
 fprintf(fid, 'Number of Contacts: %d\n', nc);
 fprintf(fid, 'Configuration: %s\n', Configuration);
 fprintf(fid, 'EM Configuration: %s\n', EM_Configuration);
+fprintf(fid, 'Surface: %s\n', Surface);
 fprintf(fid, 'Angle from Gravity: %s\n', GravityAngle);
 fprintf(fid, 'Processed Time: %s\n', StartTimeStr);
 fprintf(fid, 'Notes: %s\n\n', Notes);

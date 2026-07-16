@@ -13,6 +13,7 @@ files = dir(fullfile(rootDir, '*', 'metaData.txt'));
 layout = {};
 angle = {};
 em = {};
+surface = {};
 lt = {};
 
 true_positive = [];
@@ -33,6 +34,7 @@ for i = 1:numel(files)
     c = extractValue(txt,'Configuration');
     a = extractValue(txt,'Angle from Gravity');
     e = extractValue(txt,'EM Configuration');
+    s = extractValue(txt,'Surface');
     loop_time = extractValue(txt,'Average Loop Time');
 
 
@@ -52,6 +54,7 @@ for i = 1:numel(files)
     layout{end+1,1} = c;
     angle{end+1,1} = a;       % keep raw angle
     em{end+1,1} = e;          % keep raw EM
+    surface{end+1,1} = s;  
     lt{end+1,1} = loop_time;
 
 
@@ -66,14 +69,19 @@ end
 % =========================
 % RAW TABLE
 % =========================
-rawTable = table(layout, angle, em, true_positive,detached_count,true_positive_count,w_margin, w_margin_std, lt, ...
-    'VariableNames', {'Configuration','Angle','EM_Config', ...
+rawTable = table(layout, angle, em, surface, true_positive,detached_count,true_positive_count,w_margin, w_margin_std, lt, ...
+    'VariableNames', {'Configuration','Angle','EM_Config', 'Surface', ...
                       'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
 
 % =========================
 % AGGREGATE
 % =========================
 outputTable = aggregateGroups(rawTable);
+
+% =========================
+% CLEAN UP OUTPUT TABLE
+% =========================
+outputTable = cleanTable(outputTable);
 
 end
 
@@ -88,12 +96,13 @@ function outputTable = aggregateGroups(rawTable)
     layouts = getUnique(rawTable.Configuration);
     angles  = getUnique(rawTable.Angle);
     em      = getUnique(rawTable.EM_Config);
+    surface = getUnique(rawTable.Surface);
 
     %% create all combinations
-    [L, A, E] = ndgrid(layouts, angles, em);
+    [S, E, A, L] = ndgrid(surface, em, angles, layouts);
 
-    outputTable = table(L(:), A(:), E(:), ...
-                        'VariableNames', {'Configuration','Angle','EM_Config'});
+    outputTable = table(L(:), A(:), E(:), S(:), ...
+                        'VariableNames', {'Configuration','Angle','EM_Config','Surface'});
     outputTableData = table('Size',[0 6], ...
     'VariableTypes',{'double','double','double','double','double','double'}, ...
     'VariableNames',{'TruePositiveRate','DetachmentCount','TruePositiveCount',...
@@ -102,7 +111,7 @@ function outputTable = aggregateGroups(rawTable)
     %% loop all raw data and aggregate information
     for i = 1:size(outputTable,1)
         % config is all the check if em are all, then check if 
-        mask = getMask(rawTable,outputTable.Configuration(i),outputTable.Angle(i),outputTable.EM_Config(i));
+        mask = getMask(rawTable,outputTable.Configuration(i),outputTable.Angle(i),outputTable.EM_Config(i),outputTable.Surface(i));
         outputTableData(i,:) = combineResults(rawTable,mask);
     end
 
@@ -120,7 +129,7 @@ function output = getUnique(input)
     end
 end
 
-function mask = getMask(data,layout,angle,em_config)
+function mask = getMask(data,layout,angle,em_config,surface)
     mask = true(height(data),1);
 
     if layout ~= "all"
@@ -133,6 +142,10 @@ function mask = getMask(data,layout,angle,em_config)
 
     if em_config ~= "all"
         mask = mask & data.EM_Config == em_config;
+    end
+
+    if surface ~= "all"
+        mask = mask & data.Surface == surface;
     end
 
 end
@@ -210,4 +223,11 @@ if isempty(tok)
 else
     num = str2double(tok{1});
 end
+end
+
+function table = cleanTable(inputTable)
+    table = rmmissing(inputTable, 'DataVariables', ...
+    {'TruePositiveRate', 'DetachmentCount', 'TruePositiveCount', ...
+     'WrenchMargin', 'WrenchMarginStd', 'LoopTime_ms'});
+
 end

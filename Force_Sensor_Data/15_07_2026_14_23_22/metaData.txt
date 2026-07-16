@@ -4,8 +4,9 @@ ID: 21
 Number of Contacts: 1
 Configuration: single
 EM Configuration: on
+Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 14:27:48
+Processed Time: 16/07/2026 15:21:19
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-23-22_FT47397.csv
@@ -20,9 +21,9 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
 mass   : 1.617000
 
 -------------------- CONTACT DATA --------------------
@@ -45,13 +46,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 14
 
-True Positive Events             : 9
-True Positive Rate               : 64.29 %
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
 
-Mean W Margin                   : 23.814876
-W Margin STDDEV                 : 27.577534 %
+Mean W Margin                   : 11.477378
+W Margin STDDEV                 : 16.443859 %
 
-Average Optimisation Frequency   : 416.40 Hz
-Average Loop Time                : 2.402 ms
+Average Optimisation Frequency   : 686.24 Hz
+Average Loop Time                : 1.457 ms
 
 ==================== END OF REPORT ====================

@@ -4,8 +4,9 @@ ID: 13
 Number of Contacts: 2
 Configuration: flat
 EM Configuration: on-on
+Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 14:26:58
+Processed Time: 16/07/2026 15:20:05
 Notes: 
 
 Force Sensor Filename: 2026-07-14_16-45-03_FT47397.csv
@@ -20,9 +21,9 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
 mass   : 1.998000
 
 -------------------- CONTACT DATA --------------------
@@ -60,13 +61,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 14
 
-True Positive Events             : 7
-True Positive Rate               : 50.00 %
+True Positive Events             : 1
+True Positive Rate               : 7.14 %
 
-Mean W Margin                   : 9.823562
-W Margin STDDEV                 : 17.538717 %
+Mean W Margin                   : 5.888425
+W Margin STDDEV                 : 22.032468 %
 
-Average Optimisation Frequency   : 278.84 Hz
-Average Loop Time                : 3.586 ms
+Average Optimisation Frequency   : 417.10 Hz
+Average Loop Time                : 2.398 ms
 
 ==================== END OF REPORT ====================
