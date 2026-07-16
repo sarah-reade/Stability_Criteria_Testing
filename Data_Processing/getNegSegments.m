@@ -1,4 +1,4 @@
-function negTimeSegments = getNegSegments(gamma_out,margin)
+function negTimeSegments = getNegSegments(time,gamma_out,margin)
     isNeg = gamma_out < margin;
 
     % Find rising/falling edges

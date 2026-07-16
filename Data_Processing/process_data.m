@@ -35,9 +35,12 @@ for selectionIdx = 1:numel(selectedIdxs)
     try
         % Parse sample rate, sensor channels, and metadata from selected CSV.
         targetRate = 10; % desired display rate (Hz)
-        [sampleRate, sensorData, csvMeta] = readFilterSensorCsv(imucsvPath);
+        [sampleRate, sensorData, csvMeta] = readFilterSensorCsv(fscsvPath,targetRate);
     catch ME
-        errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
+        msg = sprintf(['Failed to load Force Sensor CSV:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'CSV Read Error');
         continue;
     end
     
@@ -58,9 +61,14 @@ for selectionIdx = 1:numel(selectedIdxs)
         [imuData,imuRawData,scriptParameters,motionTimepoints] = readFilterIMUCsv(imucsvPath,time);
         scriptParameters.hz = targetRate;
     catch ME
-        errordlg(sprintf('Failed to load CSV:\n\n%s', ME.message), 'CSV Read Error');
+        msg = sprintf(['Failed to load IMU CSV:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'CSV Read Error');
         continue;
     end
+
+    parameters = getParams(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'),selectedRecord.('Surface'));
 
     wrench = [force,torque];
     gamma_cnstr = zeros(height(wrench),1);
@@ -71,7 +79,6 @@ for selectionIdx = 1:numel(selectedIdxs)
     loop_time = zeros(height(wrench),1);
 
     try 
-        parameters = getParams(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'),selectedRecord.('Surface'));
 
         for sampleIdx = 1:height(wrench)
             tStart = tic;
@@ -80,7 +87,10 @@ for selectionIdx = 1:numel(selectedIdxs)
         end
         
     catch ME
-        errordlg(sprintf('Failed to obtain adhesion criteria:\n\n%s', ME.message), 'Adhesion Calculation Error');
+        msg = sprintf(['Failed to obtain adhesion criteria:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'Adhesion Calculation Error');
         continue;
     end
     
@@ -88,27 +98,31 @@ for selectionIdx = 1:numel(selectedIdxs)
     gamma_out = beta;
     
     try 
-        saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters)
+        outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters);
 
     catch ME
-        errordlg(sprintf('Failed to save data:\n\n%s', ME.message), 'Saving Error');
+        msg = sprintf(['Failed to save data:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'Saving Error');
         continue;
-
     end
     
     margin = 0;
     
     try 
-        negTimeSegments = getNegSegments(gamma_out,margin);
-        [fig1,axs1] = makeFigure1(selectedRecord, csvMeta, sampleRate,wrench,imuData,gamma_out);
+        negTimeSegments = getNegSegments(time,gamma_out,margin);
+        [fig1,axs1] = makeFigure1(selectedRecord, csvMeta, sampleRate,time,wrench,fscsvFilename,imuData,gamma_out);
         plotOverlay(axs1,motionTimepoints,negTimeSegments);
         [fig2,axs2] = plotOptimVariables(time, variables, nc, all_beta, negTimeSegments, motionTimepoints);
         plotOverlay(axs2,motionTimepoints,negTimeSegments);
     
     catch ME
-        errordlg(sprintf('Failed to generate plots:\n\n%s', ME.message), 'Plotting Error');
+        msg = sprintf(['Failed to generate plots:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'Plotting Error');
         continue;
-
     end
     
     try
@@ -116,9 +130,11 @@ for selectionIdx = 1:numel(selectedIdxs)
         saveFigure(fig2, outDir, "fig2", fscsvFilename, imucsvFilename);
 
     catch ME
-        errordlg(sprintf('Failed to save plots:\n\n%s', ME.message), 'Saving Plots Error');
+        msg = sprintf(['Failed to save plots:\n\n%s\n\n' ...
+                    'Function: %s\nLine: %d'], ...
+                    ME.message, ME.stack(1).name, ME.stack(1).line);
+        errordlg(msg, 'Saving Plots Error');
         continue;
-
     end
         
     

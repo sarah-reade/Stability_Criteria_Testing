@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: off-off
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 15:56:39
+Processed Time: 16/07/2026 17:31:12
 Notes: first data flip
 
 Force Sensor Filename: 2026-07-07_18-58-54_FT47397.csv
@@ -67,7 +67,7 @@ True Positive Rate               : 91.67 %
 Mean W Margin                   : 13.635732
 W Margin STDDEV                 : 16.754335 %
 
-Average Optimisation Frequency   : 420.78 Hz
-Average Loop Time                : 2.377 ms
+Average Optimisation Frequency   : 399.79 Hz
+Average Loop Time                : 2.501 ms
 
 ==================== END OF REPORT ====================

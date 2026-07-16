@@ -3,9 +3,9 @@ function plotOverlay(axs,motionTimepoints,negTimeSegments)
     %axs = findall(fig, 'Type', 'axes');
     
     for axisIdx = 1:numel(axs)
-        if axs(axisIdx) == infoAx
-            continue
-        end
+        % if axs(axisIdx) == infoAx
+        %     continue
+        % end
         
         plotMotionPoints(axs(axisIdx),motionTimepoints);
         plot_background(axs(axisIdx),negTimeSegments);

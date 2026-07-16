@@ -1,6 +1,6 @@
-function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate, wrench,imuData,gamma)
+function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate,time, wrench,fscsvFilename,imuData,gamma)
     infoText = buildInfoBoxString(selectedRecord, csvMeta, sampleRate, height(wrench));
-    
+    axs = [];
     % Layout: info panel, force components, torque components, derivative panel.
     fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
     tiledlayout(fig, 6, 1, ...
@@ -43,7 +43,7 @@ function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate, wrench,imu
     axs = [axs,ax];
 
     ax = nexttile;
-    plot(imuData.time, [imuData.linX imuData.linY imuData.linZ], 'LineWidth', 1.5);
+    plot(imuData.Time, [imuData.linX imuData.linY imuData.linZ], 'LineWidth', 1.5);
     grid on;
     xlabel('Time (s)');
     ylabel('Linear Acceleration');
@@ -53,7 +53,7 @@ function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate, wrench,imu
     axs = [axs,ax];
 
     ax = nexttile;
-    plot(imuData.time, [imuData.gyrX imuData.gyrY imuData.gyrZ], 'LineWidth', 1.5);
+    plot(imuData.Time, [imuData.gyrX imuData.gyrY imuData.gyrZ], 'LineWidth', 1.5);
     grid on;
     xlabel('Time (s)');
     ylabel('Gyroscope');
@@ -71,7 +71,6 @@ function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate, wrench,imu
     xlabel(ax, 'Time (s)');
     ylabel(ax, 'value');
     title(ax, 'gamma', 'Interpreter', 'none');
-    plot_background(ax,negTimeSegments);
     % legend(ax, {'gamma', 'beta'}, 'Location', 'best');
 
     axs = [axs,ax];

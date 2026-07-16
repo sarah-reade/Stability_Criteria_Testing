@@ -1,4 +1,4 @@
-function saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters)
+function outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters)
     datetime_string = csvMeta.startTime;
     datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
     outDir = make_directory(datetime_string,overwrite);
@@ -44,12 +44,12 @@ function export_sensor_dataset_csv( outDir, ...
     T.time = time;
 
     % Wrench data
-    T.Fx   = wrenchData.Fx;
-    T.Fy   = wrenchData.Fy;
-    T.Fz   = wrenchData.Fz;
-    T.Taux = wrenchData.Tx;
-    T.Tauy = wrenchData.Ty;
-    T.Tauz = wrenchData.Tz;
+    T.Fx   = wrenchData(:,1);
+    T.Fy   = wrenchData(:,2);
+    T.Fz   = wrenchData(:,3);
+    T.Taux = wrenchData(:,4);
+    T.Tauy = wrenchData(:,5);
+    T.Tauz = wrenchData(:,6);
 
     % IMU data
     T.LinX = imuData.linX;

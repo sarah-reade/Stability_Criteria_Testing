@@ -1,7 +1,7 @@
 function [fig,axs] = plotOptimVariables(time, variables, nc, beta, negTimeSegments,motionTimepoints)
 
     %PLOTOPTIMVARIABLES Plot the reconstructed contact variables and beta terms.
-
+    axs = [];
     % Extract the envelope used for the final constraint plot.
     beta_copy = beta;
     gamma = min(min(beta_copy, [], 2), [], 3);
