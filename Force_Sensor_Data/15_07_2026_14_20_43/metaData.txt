@@ -5,7 +5,7 @@ Number of Contacts: 1
 Configuration: single
 EM Configuration: off
 Angle from Gravity: 90
-Processed Time: 15/07/2026 15:22:41
+Processed Time: 16/07/2026 14:27:38
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-20-43_FT47397.csv
@@ -30,7 +30,7 @@ mass   : 1.617000
 CONTACT 1
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.010000
+s       : 0.100000
 gravity : 6.305746
 c       : 1.000000
 
@@ -51,7 +51,7 @@ True Positive Rate               : 100.00 %
 Mean W Margin                   : 17.335766
 W Margin STDDEV                 : 18.356100 %
 
-Average Optimisation Frequency   : 830.83 Hz
-Average Loop Time                : 1.204 ms
+Average Optimisation Frequency   : 427.84 Hz
+Average Loop Time                : 2.337 ms
 
 ==================== END OF REPORT ====================

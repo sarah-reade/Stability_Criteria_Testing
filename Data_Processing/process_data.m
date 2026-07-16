@@ -1189,9 +1189,9 @@ function parameters = get_params(config,angle,emconfig)
 
     parameters.mu = 1.0;
     r = 0.077;
-    parameters.r_x = r/8;
-    parameters.r_y = r/8;
-    parameters.reff = r*10;
+    parameters.r_x = r;%/8;
+    parameters.r_y = r;%/8;
+    parameters.reff = r;%*10;
 
     m_em = 0.4;
     m_pm = 0.002*19;
@@ -1405,30 +1405,32 @@ function [x,beta] = solveSOCP(parameters, wrench)
     ncol = 6 * nc + 1;
     
     A = zeros(nrow, ncol);
+    b = zeros(nrow,1);
     
-    b = [];
+    % b = [];
 
-    for i = 1:nc
-        cols = (6*(i-1)+1):(6*i);
-        rows = (5*(i-1)+1):(5*i);
+    % for i = 1:nc
+    %     cols = (6*(i-1)+1):(6*i);
+    %     rows = (5*(i-1)+1):(5*i);
     
-        % z component (always 1)
-        A(rows, cols(3)) = -1;
+    %     % z component (always 1)
+    %     A(rows, cols(3)) = -1;
     
-        % angular x/y contributions
-        A(rows(1:2), cols(4)) = [ 2/r_x; -2/r_x ];
-        A(rows(3:4), cols(5)) = [ 2/r_y; -2/r_y ];
+    %     % angular x/y contributions
+    %     A(rows(1:2), cols(4)) = [ 2/r_x; -2/r_x ];
+    %     A(rows(3:4), cols(5)) = [ 2/r_y; -2/r_y ];
 
-        % last column = 1
-        A(rows, end) = 1;
+    %     % last column = 1
+    %     A(rows, end) = 1;
 
-        b = [b; Fa(i) * ones(5,1)];
-    end
+    %     b = [b; Fa(i) * ones(5,1)];
+    % end
     
     % -----------------------------
     % SOC inequalities
     % -----------------------------
     for i = 1:nc
+        % -------- friction ---------%
         Asoc = zeros(3, ncol);
 
         startCol = 6*(i-1) + 1;
@@ -1443,9 +1445,29 @@ function [x,beta] = solveSOCP(parameters, wrench)
         dsoc(startCol + 2,1) = mu;
         dsoc(end,1) = -1;
 
-        gamma = mu*Fa(i);
+        gamma = -mu*Fa(i);
         
         socConstraints(nc+1-i) = secondordercone(Asoc,bsoc,dsoc,gamma);
+
+
+        % -------- tipping ---------%
+        nrows = 2;
+        Asoc = zeros(nrows, ncol);
+
+        startCol = 6*(i-1) + 4;
+
+        Asoc(1, startCol)     = 2/r_x;
+        Asoc(2, startCol + 1) = 2/r_y;
+
+        bsoc = zeros(nrows,1);
+
+        dsoc = zeros(ncol, 1);
+        dsoc(startCol + 2,1) = 1;
+        dsoc(end,1) = -1;
+
+        gamma = -Fa(i);
+        
+        socConstraints(2*nc+1-i) = secondordercone(Asoc,bsoc,dsoc,gamma);
     end
 
 

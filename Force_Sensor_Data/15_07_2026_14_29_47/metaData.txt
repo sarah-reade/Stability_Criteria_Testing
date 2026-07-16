@@ -5,7 +5,7 @@ Number of Contacts: 1
 Configuration: single
 EM Configuration: off
 Angle from Gravity: 180
-Processed Time: 15/07/2026 14:40:57
+Processed Time: 16/07/2026 14:25:51
 Notes: 
 
 Force Sensor Filename: 2026-07-15_14-29-47_FT47397.csv
@@ -23,14 +23,14 @@ mu     : 1.000000
 r_x    : 0.009625
 r_y    : 0.009625
 r_eff  : 0.770000
-mass   : 1.078000
+mass   : 1.617000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.500000
+s       : 0.100000
 gravity : 0.000000
 c       : 1.000000
 
@@ -45,13 +45,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 13
 
-True Positive Events             : 1
-True Positive Rate               : 7.69 %
+True Positive Events             : 8
+True Positive Rate               : 61.54 %
 
-Mean W Margin                   : 3.009555
-W Margin STDDEV                 : 8.456385 %
+Mean W Margin                   : 9.106197
+W Margin STDDEV                 : 10.218245 %
 
-Average Optimisation Frequency   : 779.09 Hz
-Average Loop Time                : 1.284 ms
+Average Optimisation Frequency   : 422.43 Hz
+Average Loop Time                : 2.367 ms
 
 ==================== END OF REPORT ====================

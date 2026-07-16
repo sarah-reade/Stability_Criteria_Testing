@@ -5,7 +5,7 @@ Number of Contacts: 1
 Configuration: single
 EM Configuration: on
 Angle from Gravity: 90
-Processed Time: 15/07/2026 15:22:49
+Processed Time: 16/07/2026 14:27:48
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-23-22_FT47397.csv
@@ -30,7 +30,7 @@ mass   : 1.617000
 CONTACT 1
 -----------------------------------------------------
 f_d     : 1850.000000
-s       : 0.010000
+s       : 0.100000
 gravity : 6.305746
 c       : 1.000000
 
@@ -45,13 +45,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 14
 
-True Positive Events             : 14
-True Positive Rate               : 100.00 %
+True Positive Events             : 9
+True Positive Rate               : 64.29 %
 
 Mean W Margin                   : 23.814876
 W Margin STDDEV                 : 27.577534 %
 
-Average Optimisation Frequency   : 828.81 Hz
-Average Loop Time                : 1.207 ms
+Average Optimisation Frequency   : 416.40 Hz
+Average Loop Time                : 2.402 ms
 
 ==================== END OF REPORT ====================

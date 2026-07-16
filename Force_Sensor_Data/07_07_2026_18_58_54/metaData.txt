@@ -5,7 +5,7 @@ Number of Contacts: 2
 Configuration: flat
 EM Configuration: off-off
 Angle from Gravity: 90
-Processed Time: 15/07/2026 14:38:18
+Processed Time: 16/07/2026 14:36:42
 Notes: first data flip
 
 Force Sensor Filename: 2026-07-07_18-58-54_FT47397.csv
@@ -20,17 +20,17 @@ gyrThreshold      : 0.0600000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
-mass   : 1.332000
+r_x    : 0.077000
+r_y    : 0.077000
+r_eff  : 0.077000
+mass   : 1.998000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.500000
+s       : 0.100000
 gravity : 6.305746
 c       : 1.000000
 
@@ -45,7 +45,7 @@ Adjoint Matrix (6x6):
 CONTACT 2
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.500000
+s       : 0.100000
 gravity : 7.514896
 c       : 1.000000
 
@@ -60,13 +60,13 @@ Adjoint Matrix (6x6):
 --------------- POST PROCESSING RESULTS ---------------
 Number of Detachment Events      : 12
 
-True Positive Events             : 9
-True Positive Rate               : 75.00 %
+True Positive Events             : 10
+True Positive Rate               : 83.33 %
 
-Mean W Margin                   : 6.662526
-W Margin STDDEV                 : 14.044027 %
+Mean W Margin                   : 10.616555
+W Margin STDDEV                 : 13.826481 %
 
-Average Optimisation Frequency   : 542.08 Hz
-Average Loop Time                : 1.845 ms
+Average Optimisation Frequency   : 421.16 Hz
+Average Loop Time                : 2.374 ms
 
 ==================== END OF REPORT ====================
