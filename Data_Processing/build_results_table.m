@@ -1,5 +1,8 @@
-function outputTable = build_results_table(rootDir)
+function outputTable = build_results_table(rootDir,detachSeverity)
 % Builds dataset + provides filtering + aggregation utilities
+if nargin < 2
+    detachSeverity = "Motion";
+end
 
 if nargin < 1
     rootDir = fullfile(pwd, 'Force_Sensor_Data');
@@ -38,12 +41,19 @@ for i = 1:numel(files)
     loop_time = extractValue(txt,'Average Loop Time');
 
 
-    tp = extractNumeric(txt,'True Positive Rate');
-    dc = extractNumeric(txt,'Number of Detachment Events');
-    tpc = extractNumeric(txt,'True Positive Events');
+    if detachSeverity == "Motion"
+        subheading = '---- Any Motion ----';
+    else
+        subheading = '---- Full Detachment ----';
+        detachSeverity = "Detachment";
+    end
 
-    wm = extractNumeric(txt,'Mean W Margin');
-    wms = extractNumeric(txt,'W Margin STDDEV');
+    dc = extractNumeric(txt, sprintf('Number of %s Events', detachSeverity));
+    tp = extractNumeric(txt,'True Positive Rate',subheading);
+    tpc = extractNumeric(txt,'True Positive Events',subheading);
+
+    wm = extractNumeric(txt,'Mean W Margin',subheading);
+    wms = extractNumeric(txt,'W Margin STDDEV',subheading);
 
 
     if isempty(c) || isempty(a) || isempty(e)
@@ -215,9 +225,19 @@ else
 end
 end
 
-function num = extractNumeric(txt, key)
-expr = [key '\s*:\s*([-+]?\d*\.?\d+|NaN)'];
-tok = regexp(txt, expr, 'tokens', 'once');
+function num = extractNumeric(txt, key, subheading)
+if nargin < 3
+    expr = [regexptranslate('escape', key) ...
+            '\s*:\s*([-+]?\d*\.?\d+|NaN)'];
+else
+    expr = [regexptranslate('escape', subheading) ...
+            '.*?' ...
+            regexptranslate('escape', key) ...
+            '\s*:\s*([-+]?\d*\.?\d+|NaN)'];
+end
+
+tok = regexp(txt, expr, 'tokens', 'once', 'dotall');
+
 if isempty(tok)
     num = NaN;
 else

@@ -34,11 +34,28 @@ function plot_background(ax,negTimeSegments)
 end
 
 
-function plotMotionPoints(ax,motionTimepoints)
-    if ~isempty(motionTimepoints)
-        xl = xline(ax, motionTimepoints.Time, '--r', 'LineWidth', 1);
-        xe = xline(ax, motionTimepoints.EndTime, '--b', 'LineWidth', 1);
+function plotMotionPoints(ax, timestamps)
+
+    % Plot movement timestamps (lighter)
+    if ~isempty(timestamps.movementTimestamps)
+        xl = xline(ax, timestamps.movementTimestamps.Time, '--', ...
+            'Color', [1.0, 0.6, 0.6], 'LineWidth', 1);
+        xe = xline(ax, timestamps.movementTimestamps.EndTime, '--', ...
+            'Color', [0.6, 0.8, 1.0], 'LineWidth', 1);
+
         set(xl, 'HandleVisibility', 'off');
         set(xe, 'HandleVisibility', 'off');
     end
+
+    % Plot detachment timestamps (stronger)
+    if ~isempty(timestamps.detachTimestamps)
+        xl = xline(ax, timestamps.detachTimestamps.Time, '--r', ...
+            'LineWidth', 1.5);
+        xe = xline(ax, timestamps.detachTimestamps.EndTime, '--b', ...
+            'LineWidth', 1.5);
+
+        set(xl, 'HandleVisibility', 'off');
+        set(xe, 'HandleVisibility', 'off');
+    end
+
 end

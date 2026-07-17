@@ -8,7 +8,10 @@ dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
 
 dataReg = getDataReg(dataRegPath);
 
-[overwrite,clearPlots,selectedIdxs] = runSelectionUi(dataReg);
+[processDataParams,selectedIdxs] = runSelectionUi(dataReg);
+ overwrite = processDataParams.overwrite;
+ clearPlots = processDataParams.clearPlots;
+ detachSeverity = processDataParams.detachSeverity;
 
 if isempty(selectedIdxs)
     return;
@@ -69,8 +72,10 @@ for selectionIdx = 1:numel(selectedIdxs)
 
     parameters = getParams(selectedRecord.('Configuration'),string(selectedRecord.('Angle from Gravity')),selectedRecord.('EM Config'),selectedRecord.('Surface'));
 
+    wrench = [force,torque];
+
     try 
-        [scriptParameters,motionTimepoints] = find_slips_and_tips(imuData,wrenchData,parameters.reff,'mag');
+        [scriptParameters,motionTimepoints] = find_slips_and_tips(imuData,wrench,parameters.reff,'mag');
         scriptParameters.hz = targetRate;
     catch ME
         msg = sprintf(['Failed to detect slips and trips:\n\n%s\n\n' ...
@@ -82,7 +87,6 @@ for selectionIdx = 1:numel(selectedIdxs)
 
 
 
-    wrench = [force,torque];
     gamma_cnstr = zeros(height(wrench),1);
     nc = numel(parameters.c);
     variables = zeros(height(wrench),nc*6 + 1);
@@ -158,7 +162,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     
 end
 
-results = build_results_table(dataDir);
-displayTableAndSaveCSV(results);
+results = build_results_table(dataDir,detachSeverity);
+displayTableAndSaveCSV(results,detachSeverity);
 
 end

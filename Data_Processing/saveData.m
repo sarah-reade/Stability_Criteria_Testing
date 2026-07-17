@@ -79,23 +79,29 @@ function export_sensor_dataset_csv( outDir, ...
     T.gamma = gamma;
 
     N = numel(time);
-    M = numel(motionTimepoints.Time);
+    M = numel(motionTimepoints.movementTimestamps.Time);
 
     T.attached = ones(N,1);   % Default to 1 outside detach intervals.
-    T.fullyattached = ones(N,1);   % Default to 1 outside motion intervals.
 
     for j = 1:M
-        inInterval = (time >= motionTimepoints.Time(j)) & ...
-                    (time <= motionTimepoints.EndTime(j));
+        inInterval = (time >= motionTimepoints.movementTimestamps.Time(j)) & ...
+                    (time <= motionTimepoints.movementTimestamps.EndTime(j));
 
-        T.fullyattached(inInterval) = 0;
+        T.securelyAttached(inInterval) = 0;
+    end
 
+    M = numel(motionTimepoints.detachTimestamps.Time);
+
+    T.attached = ones(N,1);   % Default to 1 outside detach intervals.
+
+    for j = 1:M
         inInterval = (time >= motionTimepoints.detachTimestamps.Time(j)) & ...
                     (time <= motionTimepoints.detachTimestamps.EndTime(j));
 
         T.attached(inInterval) = 0;
     end
 
+    % Cut start and end
     T = T(21:end-20, :);
 
     outName = 'data.csv';
@@ -177,8 +183,8 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '---------------- SCRIPT PARAMETERS -----------------\n');
     fprintf(fid, 'hz    : %.6f\n', hz);
     fprintf(fid, '---------- IMU Thresholds:\n');
-    fprintf(fid, 'linThreshold      : %.10f\n', imu_linThresh);
-    fprintf(fid, 'gyrThreshold      : %.10f\n', imu_gyrThresh);
+    fprintf(fid, 'linThresholds    : %.10f\n [any motion,full detachment]', imu_linThresh);
+    fprintf(fid, 'gyrThresholds    : %.10f\n [any motion,full detachment]', imu_gyrThresh);
     fprintf(fid, 'wrenchThreshold      : %.10f\n', imu_wrenchThreshold);
     fprintf(fid, 'refractoryPeriod  : %.10f\n', imu_refPer);
 
@@ -214,17 +220,32 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
 
     % ===== Post Processing Results =====
     fprintf(fid, '--------------- POST PROCESSING RESULTS ---------------\n');
-    fprintf(fid, 'Number of Detachment Events      : %d\n', ppdata.detached_count);
+    fprintf(fid, '---- Any Motion ----\n');
+    fprintf(fid, 'Number of Motion Events      : %d\n', ppdata.securelyAttached.detached_count);
     fprintf(fid, '\n');
-    fprintf(fid, 'True Positive Events             : %d\n', ppdata.true_positive_count);
-    fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.true_positive);
+    fprintf(fid, 'True Positive Events             : %d\n', ppdata.securelyAttached.true_positive_count);
+    fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.securelyAttached.true_positive);
     fprintf(fid, '\n');
 
-    fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.w_margin);
+    fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.securelyAttached.w_margin);
     fprintf(fid, 'W Margin STDDEV                 : ');
-    fprintf(fid, '%.6f %%\n', ppdata.w_margin_std);
+    fprintf(fid, '%.6f %%\n', ppdata.securelyAttached.w_margin_std);
     fprintf(fid, '\n');
 
+
+    fprintf(fid, '---- Full Detachment ----\n');
+    fprintf(fid, 'Number of Detachment Events      : %d\n', ppdata.attached.detached_count);
+    fprintf(fid, '\n');
+    fprintf(fid, 'True Positive Events             : %d\n', ppdata.attached.true_positive_count);
+    fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.attached.true_positive);
+    fprintf(fid, '\n');
+
+    fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.attached.w_margin);
+    fprintf(fid, 'W Margin STDDEV                 : ');
+    fprintf(fid, '%.6f %%\n', ppdata.attached.w_margin_std);
+    fprintf(fid, '\n');
+
+    fprintf(fid, '---- Loop Data ----\n');
     fprintf(fid, 'Average Optimisation Frequency   : %.2f Hz\n', ...
         ppdata.average_loop_speed);
     fprintf(fid, 'Average Loop Time                : %.3f ms\n', ...

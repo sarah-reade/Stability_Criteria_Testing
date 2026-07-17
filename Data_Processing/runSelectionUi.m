@@ -1,4 +1,4 @@
-function [overwrite,plots,selectedIdxs] = runSelectionUi(dataReg)
+function [processDataParams,selectedIdxs] = runSelectionUi(dataReg)
 
     if height(dataReg) == 0
         errordlg('No valid entries exist in Data_Reg.csv.', 'No Data Available');
@@ -7,7 +7,11 @@ function [overwrite,plots,selectedIdxs] = runSelectionUi(dataReg)
 
     displayItems = buildDisplayItems(dataReg);
     infoItems = buildInfoItems(dataReg);
-    [overwrite,plots,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+    [overwrite,plots,detachSeverity,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+    
+    processDataParams.overwrite = overwrite;
+    processDataParams.clearPlots = plots;
+    processDataParams.detachSeverity = detachSeverity;
 
 end
 
@@ -56,11 +60,13 @@ end
 
 end
 
-function [overwrite,plots,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,plots,detachSeverity,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
-overwrite = false;
+overwrite = true;
+plots = false;
+detachSeverity = "Motion";
 rowCount = height(dataReg);
 selectedMask = false(rowCount, 1);
 selectionConfirmed = false;
@@ -85,8 +91,8 @@ mainGrid.RowHeight = {120, 60, '1x', 80};
 controlPanel = uipanel(mainGrid, 'Title', 'Controls');
 controlPanel.Layout.Row = [1 2];
 
-mainGridLayout = uigridlayout(controlPanel, [2 1]);
-mainGridLayout.RowHeight = {90, 40};
+mainGridLayout = uigridlayout(controlPanel, [3 1]);
+mainGridLayout.RowHeight = {60, 40, 40};
 mainGridLayout.Padding = [8 8 8 8];
 mainGridLayout.RowSpacing = 10;
 
@@ -102,44 +108,63 @@ uibutton(actionsGrid, 'Text', 'Clear Selection', 'ButtonPushedFcn', @clearSelect
 uibutton(actionsGrid, 'Text', 'Select All', 'ButtonPushedFcn', @selectAllRows);
 
 %% ---------------- FILTERS (top row) ----------------
-filterGrid = uigridlayout(mainGridLayout, [1 10]);
+filterGrid = uigridlayout(mainGridLayout, [1 8]);
 filterGrid.Layout.Row = 2;
 
-filterGrid.ColumnWidth = {100, '1x', 100, '1x', 100, '1x',150, '1x',150, 40, 40,40};
+filterGrid.ColumnWidth = {80, '1x', 100, '1x', 60, '1x',60, '1x'};
 filterGrid.RowHeight = {24};
 
-uilabel(filterGrid, 'Text', 'Configuration');
+uilabel(filterGrid, 'Text', 'Configuration', ...
+    'HorizontalAlignment', 'right');
 configurationDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'flat', 'RA', 'single'}, ...
     'Value', 'All', ...
     'ValueChangedFcn', @onFilterChange);
 
-uilabel(filterGrid, 'Text', 'AngleFromGravity');
+uilabel(filterGrid, 'Text', 'AngleFromGravity', ...
+    'HorizontalAlignment', 'right');
 angleDropDown = uidropdown(filterGrid, ...
     'Items', {'All', '0', '90', '180', '90V'}, ...
     'Value', 'All', ...
     'ValueChangedFcn', @onFilterChange);
 
-uilabel(filterGrid, 'Text', 'EM Config');
+uilabel(filterGrid, 'Text', 'EM Config', ...
+    'HorizontalAlignment', 'right');
 emDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'off', 'on', 'off-off', 'on-on', 'off-on', 'on-off'}, ...
     'Value', 'All', ...
     'ValueChangedFcn', @onFilterChange);
 
-uilabel(filterGrid, 'Text', 'Surface');
+uilabel(filterGrid, 'Text', 'Surface', ...
+    'HorizontalAlignment', 'right');
 surfaceDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'shelf', 'floor', 'steelbeam'}, ...
     'Value', 'All', ...
     'ValueChangedFcn', @onFilterChange);
 
+
+filterGrid = uigridlayout(mainGridLayout, [1 6]);
+filterGrid.Layout.Row = 3;
+
+filterGrid.ColumnWidth = {150, '1x',150, 40, 80,40};
+filterGrid.RowHeight = {24};
+
+uilabel(filterGrid, 'Text', 'Detachment Severity', ...
+    'HorizontalAlignment', 'right');
+detachmentDropDown = uidropdown(filterGrid, ...
+    'Items', {'Any Motion', 'Full Detachment'}, ...
+    'Value', 'Any Motion');
+
 uilabel(filterGrid, ...
-    'Text', sprintf('Overwrite Existing Files'));
+    'Text', sprintf('Overwrite Existing Files'), ...
+    'HorizontalAlignment', 'right');
 overwriteCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
     'Value', true);
 
 uilabel(filterGrid, ...
-    'Text', sprintf('Plot?'));
+    'Text', sprintf('Keep Plots?'), ...
+    'HorizontalAlignment', 'right');
 plotsCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
     'Value', false);
@@ -166,6 +191,7 @@ footerPanel = uipanel(mainGrid, 'BorderType', 'none');
 footerPanel.Layout.Row = 4;
 footerGrid = uigridlayout(footerPanel, [1 3]);
 footerGrid.ColumnWidth = {'1x','1x','1x'};
+footerGrid.RowHeight = {60};
 
 
 statusLabel = uilabel(footerGrid, ...
@@ -192,6 +218,14 @@ if isvalid(selectionFig)
     end
     overwrite = overwriteCheckbox.Value;
     plots = plotsCheckbox.Value;
+    detachSeverity = detachmentDropDown.Value;
+
+    if strcmp(detachSeverity, 'Any Motion')
+        detachSeverity = 'Motion';
+    elseif strcmp(detachSeverity, 'Full Detachment')
+        detachSeverity = 'Detachment';
+    end
+    
     delete(selectionFig);
 end
 

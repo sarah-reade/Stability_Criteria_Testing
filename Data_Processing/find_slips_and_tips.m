@@ -1,8 +1,7 @@
-function [params,timestamps,detachTimestamps] = find_slips_and_tips(imuData,wrenchData,reff,method)
+function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
 
     % Build a binary motion mask using either component-wise or magnitude thresholds.
 
-    mask = table();
     params.linThreshold = [1.0,4.0] ;
     params.gyrThreshold = [0.06,1.0];
     params.refractoryPeriod = 0.8;
@@ -15,17 +14,13 @@ function [params,timestamps,detachTimestamps] = find_slips_and_tips(imuData,wren
     s_gyrThreshold = params.gyrThreshold(2);
     refractoryPeriod = params.refractoryPeriod;   % seconds
     wrenchThreshold = params.wrenchThreshold;
-    
-    W_mag = norm([ ...
-        wrenchData.Fx, ...
-        wrenchData.Fy, ...
-        wrenchData.Fz, ...
-        wrenchData.Taux/reff, ...
-        wrenchData.Tauy/reff, ...
-        wrenchData.Tauz/reff ]);
+
+    wrench(:,4:6) = wrench(:,4:6) ./ reff;
+    W_mag = vecnorm(wrench,2,2);
 
     W_mag_mask = W_mag > wrenchThreshold;
 
+    
     if strcmp(method,'ind')
         %% User thresholds
         mask = getIndMask(linThreshold,gyrThreshold,imuData,W_mag_mask);
@@ -36,13 +31,11 @@ function [params,timestamps,detachTimestamps] = find_slips_and_tips(imuData,wren
         s_mask = getMagMask(s_linThreshold,s_gyrThreshold,imuData,W_mag_mask);
     end
 
-    timestamps = getTimepoints(mask,refractoryPeriod);
-    timestamps.detachTimestamps = getTimepoints(mask,refractoryPeriod);
-
+    timestamps.movementTimestamps = getTimepoints(mask,refractoryPeriod);
+    timestamps.detachTimestamps = getTimepoints(s_mask,refractoryPeriod);
 end
 
 function timestamps = getTimepoints(mask,refractoryPeriod)
-
     % Find the start of each motion segment and keep the first sample only.
     motion = any(mask{:,2:end}, 2);
 
@@ -111,6 +104,9 @@ function timestamps = getTimepoints(mask,refractoryPeriod)
 end
 
 function mask = getIndMask(linThreshold,gyrThreshold,imuData,W_mask)
+
+    mask = table();
+
     mask.Time = imuData.Time;
 
     mask.LinX = abs(imuData.linX) > linThreshold & W_mask;
@@ -123,6 +119,9 @@ function mask = getIndMask(linThreshold,gyrThreshold,imuData,W_mask)
 end
 
 function mask = getMagMask(linThreshold,gyrThreshold,imuData,W_mask)
+
+    mask = table();
+
     mask.Time = imuData.Time;
 
     mask.Lin = imuData.linX.^2+imuData.linY.^2+imuData.linZ.^2 > linThreshold^2 & W_mask;

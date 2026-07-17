@@ -13,6 +13,29 @@ function ppdata = post_process(data, reff,g_margin,w_margin)
         data = readtable(data);
     end
 
+    
+    ppdata.securelyAttached = getTruePositiveandWMargin(data, reff,g_margin,w_margin,"securelyAttached");
+    ppdata.attached = getTruePositiveandWMargin(data, reff,g_margin,w_margin);
+    
+
+    %% ---------------- Average loop speed ----------------
+    % ASSUMPTION: loop speed = inverse of loopTime
+    if ismember('loopTime', data.Properties.VariableNames)
+        valid = data.loopTime > 0;
+        ppdata.average_loop_speed = mean(1 ./ data.loopTime(valid));
+    else
+        ppdata.average_loop_speed = NaN;
+    end
+
+end
+
+
+function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachString)
+
+    if nargin < 5
+        attachString = "attached";
+    end
+
     n = height(data);
 
     %% ---------------- Init outputs ----------------
@@ -23,7 +46,7 @@ function ppdata = post_process(data, reff,g_margin,w_margin)
 
     %% ---------------- Extract signals ----------------
     t = data.time;
-    attached = data.attached;
+    attached = data.(attachString)
     gamma = data.gamma;
 
     %% ---------------- State transition tracking ----------------
@@ -56,7 +79,7 @@ function ppdata = post_process(data, reff,g_margin,w_margin)
     else
         ppdata.true_positive = NaN;
     end
-
+    
     %% ---------------- Calculate required wrench margin ----------------
     
     w_margin_values = zeros(ppdata.detached_count,1);
@@ -122,15 +145,4 @@ function ppdata = post_process(data, reff,g_margin,w_margin)
     %% Average required margin
     ppdata.w_margin = mean(w_margin_values);
     ppdata.w_margin_std = std(w_margin_values);
-
-
-    %% ---------------- Average loop speed ----------------
-    % ASSUMPTION: loop speed = inverse of loopTime
-    if ismember('loopTime', data.Properties.VariableNames)
-        valid = data.loopTime > 0;
-        ppdata.average_loop_speed = mean(1 ./ data.loopTime(valid));
-    else
-        ppdata.average_loop_speed = NaN;
-    end
-
 end

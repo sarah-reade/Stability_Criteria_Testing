@@ -1,7 +1,7 @@
-function displayTableAndSaveCSV(inputTable)
+function displayTableAndSaveCSV(inputTable,detachSeverity)
 
     % Create UI window
-    fig = uifigure('Name', 'Table Viewer', ...
+    fig = uifigure('Name', sprintf('Table Viewer - Detach Severity: %s',detachSeverity), ...
                    'Position', [100 100 800 500]);
 
     % Display table
