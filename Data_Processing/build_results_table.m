@@ -166,6 +166,8 @@ function output = combineResults(data,mask)
         mask = ones(length(data));
     end
 
+    mask = mask & ~isnan(data.DetachmentCount) & data.DetachmentCount ~= 0;
+
     if all(mask == 0)
         output = table(NaN, NaN, NaN, NaN, NaN, NaN, ...
                     'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
