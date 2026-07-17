@@ -5,7 +5,7 @@ function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
     params.linThreshold = [1.0,4.0] ;
     params.gyrThreshold = [0.06,1.0];
     params.refractoryPeriod = 0.8;
-    params.wrenchThreshold = 30;
+    params.wrenchThreshold = 10;
 
 
     linThreshold = params.linThreshold(1);
@@ -21,70 +21,60 @@ function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
     W_mag_mask = W_mag > wrenchThreshold;
 
     
-    if strcmp(method,'ind')
-        %% User thresholds
-        mask = getIndMask(linThreshold,gyrThreshold,imuData,W_mag_mask);
-        s_mask = getIndMask(s_linThreshold,s_gyrThreshold,imuData,W_mag_mask);
-
-    elseif strcmp(method,'mag')
-        mask = getMagMask(linThreshold,gyrThreshold,imuData,W_mag_mask);
-        s_mask = getMagMask(s_linThreshold,s_gyrThreshold,imuData,W_mag_mask);
-    end
+    %% User thresholds
+    [mask.start,mask.end] = getMasks(linThreshold,gyrThreshold,imuData,W_mag_mask,method);
+    [s_mask.start,s_mask.end] = getMasks(s_linThreshold,s_gyrThreshold,imuData,W_mag_mask,method);
 
     timestamps.movementTimestamps = getTimepoints(mask,refractoryPeriod);
     timestamps.detachTimestamps = getTimepoints(s_mask,refractoryPeriod);
 end
 
 function timestamps = getTimepoints(mask,refractoryPeriod)
-    % Find the start of each motion segment and keep the first sample only.
-    motion = any(mask{:,2:end}, 2);
 
-    keep = false(height(mask),1);
-    endTimeLog = -inf(height(mask),1);
+    % Start and end masks
+    motionStart = any(mask.start{:,2:end}, 2);
+    motionEnd = any(mask.end{:,2:end}, 2);
+
+    keep = false(height(mask.start),1);
+    endTimeLog = -inf(height(mask.start),1);
 
     inMotion = false;
     startMotionIndex = 0;
     endMotionTime = -inf;
 
-    for maskIdx = 1:height(mask)
+    for maskIdx = 1:height(mask.start)
 
-        t = mask.Time(maskIdx);
+        t = mask.start.Time(maskIdx);
 
-        %% ---------------------------
-        %% Enter motion
-        %% ---------------------------
-        if ~inMotion && motion(maskIdx)
+        %% Enter motion (high threshold)
+        if ~inMotion && motionStart(maskIdx)
             inMotion = true;
             startMotionIndex = maskIdx;
             endMotionTime = -inf;
             continue
         end
 
-        %% ---------------------------
         %% While in motion
-        %% ---------------------------
         if inMotion
 
-            % still moving → reset stationary timer
-            if motion(maskIdx)
+            % Still above end threshold -> continue motion
+            if motionEnd(maskIdx)
                 endMotionTime = -inf;
                 continue
             end
 
-            % motion dropped → start stationary timer
+            % Dropped below end threshold -> start refractory timer
             if endMotionTime == -inf
                 endMotionTime = t;
                 continue
             end
 
-            % check stationary duration
+            % Confirm motion has ended
             if (t - endMotionTime) >= refractoryPeriod
 
                 keep(startMotionIndex) = true;
-
                 endTimeLog(startMotionIndex) = endMotionTime;
 
-                % reset state
                 inMotion = false;
                 startMotionIndex = 0;
                 endMotionTime = -inf;
@@ -99,8 +89,26 @@ function timestamps = getTimepoints(mask,refractoryPeriod)
     end
 
     %% Final output
-    timestamps = mask(keep,:);
+    timestamps = mask.start(keep,:);
     timestamps.EndTime = endTimeLog(keep);
+
+end
+
+function [mask_start,mask_end] = getMasks(linThreshold,gyrThreshold,imuData,W_mask,method,scalar)
+    if nargin < 6
+        scalar = 4;
+    end
+    
+    if strcmp(method,'ind')
+        mask_start = getIndMask(linThreshold,gyrThreshold,imuData,W_mask);
+        W_mask = ones(height(W_mask));
+        mask_end = getIndMask(linThreshold/scalar,gyrThreshold/scalar,imuData,W_mask);
+    elseif strcmp(method,'mag')
+        mask_start = getMagMask(linThreshold,gyrThreshold,imuData,W_mask);
+        W_mask = ones(height(W_mask));
+        mask_end = getMagMask(linThreshold/scalar,gyrThreshold/scalar,imuData,W_mask);
+    end
+
 end
 
 function mask = getIndMask(linThreshold,gyrThreshold,imuData,W_mask)

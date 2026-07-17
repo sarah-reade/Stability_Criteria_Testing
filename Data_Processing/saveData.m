@@ -183,8 +183,8 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '---------------- SCRIPT PARAMETERS -----------------\n');
     fprintf(fid, 'hz    : %.6f\n', hz);
     fprintf(fid, '---------- IMU Thresholds:\n');
-    fprintf(fid, 'linThresholds    : %.10f\n [any motion,full detachment]', imu_linThresh);
-    fprintf(fid, 'gyrThresholds    : %.10f\n [any motion,full detachment]', imu_gyrThresh);
+    fprintf(fid, 'linThresholds    : %.10f [any motion,full detachment]\n', imu_linThresh);
+    fprintf(fid, 'gyrThresholds    : %.10f [any motion,full detachment]\n', imu_gyrThresh);
     fprintf(fid, 'wrenchThreshold      : %.10f\n', imu_wrenchThreshold);
     fprintf(fid, 'refractoryPeriod  : %.10f\n', imu_refPer);
 
