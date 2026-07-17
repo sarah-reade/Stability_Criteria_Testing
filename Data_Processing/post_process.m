@@ -46,7 +46,7 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
 
     %% ---------------- Extract signals ----------------
     t = data.time;
-    attached = data.(attachString)
+    attached = data.(attachString);
     gamma = data.gamma;
 
     %% ---------------- State transition tracking ----------------

@@ -81,7 +81,7 @@ function export_sensor_dataset_csv( outDir, ...
     N = numel(time);
     M = numel(motionTimepoints.movementTimestamps.Time);
 
-    T.attached = ones(N,1);   % Default to 1 outside detach intervals.
+    T.securelyAttached = ones(N,1);   % Default to 1 outside detach intervals.
 
     for j = 1:M
         inInterval = (time >= motionTimepoints.movementTimestamps.Time(j)) & ...
@@ -93,7 +93,7 @@ function export_sensor_dataset_csv( outDir, ...
     M = numel(motionTimepoints.detachTimestamps.Time);
 
     T.attached = ones(N,1);   % Default to 1 outside detach intervals.
-
+    
     for j = 1:M
         inInterval = (time >= motionTimepoints.detachTimestamps.Time(j)) & ...
                     (time <= motionTimepoints.detachTimestamps.EndTime(j));
