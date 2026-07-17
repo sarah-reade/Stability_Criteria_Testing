@@ -3,7 +3,7 @@ function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
     % Build a binary motion mask using either component-wise or magnitude thresholds.
 
     params.linThreshold = [1.0,4.0] ;
-    params.gyrThreshold = [0.06,1.0];
+    params.gyrThreshold = [0.06,0.24];
     params.refractoryPeriod = 0.8;
     params.wrenchThreshold = 10;
 
@@ -19,7 +19,9 @@ function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
     W_mag = vecnorm(wrench,2,2);
 
     W_mag_mask = W_mag > wrenchThreshold;
-
+    N = 4;                           % Expand by 4 samples each side
+    W_mag_mask = conv(double(W_mag_mask), ones(1,2*N+1), 'same') > 0;
+    W_mag_mask = logical(W_mag_mask);
     
     %% User thresholds
     [mask.start,mask.end] = getMasks(linThreshold,gyrThreshold,imuData,W_mag_mask,method);
@@ -98,15 +100,18 @@ function [mask_start,mask_end] = getMasks(linThreshold,gyrThreshold,imuData,W_ma
     if nargin < 6
         scalar = 4;
     end
-    
+
+    linThreshold_e = linThreshold/(1+linThreshold*scalar);
+    gyrThreshold_e = gyrThreshold/(1+gyrThreshold*scalar);
+
     if strcmp(method,'ind')
         mask_start = getIndMask(linThreshold,gyrThreshold,imuData,W_mask);
         W_mask = ones(height(W_mask));
-        mask_end = getIndMask(linThreshold/scalar,gyrThreshold/scalar,imuData,W_mask);
+        mask_end = getIndMask(linThreshold_e,gyrThreshold_e,imuData,W_mask);
     elseif strcmp(method,'mag')
         mask_start = getMagMask(linThreshold,gyrThreshold,imuData,W_mask);
         W_mask = ones(height(W_mask));
-        mask_end = getMagMask(linThreshold/scalar,gyrThreshold/scalar,imuData,W_mask);
+        mask_end = getMagMask(linThreshold_e,gyrThreshold_e,imuData,W_mask);
     end
 
 end
