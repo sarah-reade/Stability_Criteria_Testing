@@ -66,30 +66,24 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % Linear inequality
     % -----------------------------
 
-    nrow = 5 * nc;
+    nrow = nc;
     ncol = 6 * nc + 1;
     
     A = zeros(nrow, ncol);
-    b = zeros(nrow,1);
     
-    % b = [];
+    b = [];
 
-    % for i = 1:nc
-    %     cols = (6*(i-1)+1):(6*i);
-    %     rows = (5*(i-1)+1):(5*i);
+    for i = 1:nc
+        z_col = 6*(i-1) + 3;
     
-    %     % z component (always 1)
-    %     A(rows, cols(3)) = -1;
-    
-    %     % angular x/y contributions
-    %     A(rows(1:2), cols(4)) = [ 2/r_x; -2/r_x ];
-    %     A(rows(3:4), cols(5)) = [ 2/r_y; -2/r_y ];
+        % z component (always 1)
+        A(i, z_col) = -1;
 
-    %     % last column = 1
-    %     A(rows, end) = 1;
+        % last column = 1
+        A(i, end) = 1;
 
-    %     b = [b; Fa(i) * ones(5,1)];
-    % end
+        b = [b; Fa(i)];
+    end
     
     % -----------------------------
     % SOC inequalities
@@ -183,7 +177,17 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % disp('=====================================');
 
     [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub,opts);
-    beta = -beta;
+
+    % f = ones(6*nc+1,1);
+    % for i = 1:nc
+    %     f((i-1)*6+3) = -1;
+    % end
+    % f(end) = -1;
+    % [x,beta] = coneprog(f,socConstraints,A,b,Aeq,beq,lb,ub,opts);
+    % disp(x);
+    % disp();
+    % keyboard
+    beta = -x(length(x));
 
     %displaySOCPConstraints(x, parameters, wrench);
 end

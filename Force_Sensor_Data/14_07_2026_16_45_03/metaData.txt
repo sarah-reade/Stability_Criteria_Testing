@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: on-on
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 15:20:05
+Processed Time: 21/07/2026 15:38:11
 Notes: 
 
 Force Sensor Filename: 2026-07-14_16-45-03_FT47397.csv
@@ -16,8 +16,11 @@ IMU Filename: 20260714_164502_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
@@ -30,7 +33,7 @@ mass   : 1.998000
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 1850.000000
+f_d     : 840.000000
 s       : 0.100000
 gravity : 6.305746
 c       : 1.000000
@@ -45,7 +48,7 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 1850.000000
+f_d     : 840.000000
 s       : 0.100000
 gravity : 7.514896
 c       : 1.000000
@@ -59,15 +62,26 @@ Adjoint Matrix (6x6):
   -0.349448  -0.005194   0.000000   0.000000   0.000000   1.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 14
+---- Any Motion ----
+Number of Motion Events      : 9
 
-True Positive Events             : 1
-True Positive Rate               : 7.14 %
+True Positive Events             : 8
+True Positive Rate               : 88.89 %
 
-Mean W Margin                   : 5.888425
-W Margin STDDEV                 : 22.032468 %
+Mean W Margin                   : 3.187615
+W Margin STDDEV                 : 8.399720 %
 
-Average Optimisation Frequency   : 417.10 Hz
-Average Loop Time                : 2.398 ms
+---- Full Detachment ----
+Number of Detachment Events      : 6
+
+True Positive Events             : 6
+True Positive Rate               : 100.00 %
+
+Mean W Margin                   : 5.680908
+W Margin STDDEV                 : 13.915326 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 455.78 Hz
+Average Loop Time                : 2.194 ms
 
 ==================== END OF REPORT ====================

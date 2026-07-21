@@ -3,8 +3,8 @@ function negTimeSegments = getNegSegments(time,gamma_out,margin)
 
     % Find rising/falling edges
     d = diff([false; isNeg; false]);
-    startIdx = find(d == 1)-1;
-    endIdx   = find(d == -1);
+    startIdx = find(d == 1);
+    endIdx   = find(d == -1)-1;
     
     negSegments = [startIdx, endIdx];
     if ~isempty(negSegments) && all(negSegments(:) >= 1)

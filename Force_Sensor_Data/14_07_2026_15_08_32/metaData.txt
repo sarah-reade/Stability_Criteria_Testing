@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: on-on
 Surface: shelf
 Angle from Gravity: 90V
-Processed Time: 16/07/2026 15:19:56
+Processed Time: 21/07/2026 15:37:50
 Notes: loose mount and em cable
 
 Force Sensor Filename: 2026-07-14_15-08-32_FT47397.csv
@@ -16,8 +16,11 @@ IMU Filename: 20260714_150834_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
@@ -30,7 +33,7 @@ mass   : 1.998000
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 1850.000000
+f_d     : 840.000000
 s       : 0.100000
 gravity : 7.514896
 c       : 1.000000
@@ -45,7 +48,7 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 1850.000000
+f_d     : 840.000000
 s       : 0.100000
 gravity : -6.305746
 c       : 1.000000
@@ -59,15 +62,26 @@ Adjoint Matrix (6x6):
   -0.349448  -0.005194   0.000000   0.000000   0.000000   1.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 10
+---- Any Motion ----
+Number of Motion Events      : 10
 
-True Positive Events             : 0
-True Positive Rate               : 0.00 %
+True Positive Events             : 6
+True Positive Rate               : 60.00 %
 
-Mean W Margin                   : 0.000000
-W Margin STDDEV                 : 0.000000 %
+Mean W Margin                   : 13.479219
+W Margin STDDEV                 : 29.095417 %
 
-Average Optimisation Frequency   : 428.88 Hz
-Average Loop Time                : 2.332 ms
+---- Full Detachment ----
+Number of Detachment Events      : 7
+
+True Positive Events             : 5
+True Positive Rate               : 71.43 %
+
+Mean W Margin                   : 7.734643
+W Margin STDDEV                 : 20.463942 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 449.63 Hz
+Average Loop Time                : 2.224 ms
 
 ==================== END OF REPORT ====================

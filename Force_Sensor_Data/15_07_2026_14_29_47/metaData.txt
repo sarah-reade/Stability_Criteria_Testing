@@ -6,7 +6,7 @@ Configuration: single
 EM Configuration: off
 Surface: shelf
 Angle from Gravity: 180
-Processed Time: 16/07/2026 15:21:26
+Processed Time: 21/07/2026 15:39:56
 Notes: 
 
 Force Sensor Filename: 2026-07-15_14-29-47_FT47397.csv
@@ -16,8 +16,11 @@ IMU Filename: 20260715_142941_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
@@ -44,15 +47,26 @@ Adjoint Matrix (6x6):
    0.000000   0.000000   0.000000   0.000000   0.000000   1.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 13
+---- Any Motion ----
+Number of Motion Events      : 5
 
-True Positive Events             : 3
-True Positive Rate               : 23.08 %
+True Positive Events             : 4
+True Positive Rate               : 80.00 %
 
-Mean W Margin                   : 7.978109
-W Margin STDDEV                 : 10.850406 %
+Mean W Margin                   : 6.796814
+W Margin STDDEV                 : 7.924251 %
 
-Average Optimisation Frequency   : 678.47 Hz
-Average Loop Time                : 1.474 ms
+---- Full Detachment ----
+Number of Detachment Events      : 5
+
+True Positive Events             : 4
+True Positive Rate               : 80.00 %
+
+Mean W Margin                   : 6.796814
+W Margin STDDEV                 : 7.924251 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 706.44 Hz
+Average Loop Time                : 1.416 ms
 
 ==================== END OF REPORT ====================

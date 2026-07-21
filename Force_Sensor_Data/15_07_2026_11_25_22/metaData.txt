@@ -4,9 +4,10 @@ ID: 18
 Number of Contacts: 2
 Configuration: RA
 EM Configuration: off-off
+Surface: steelbeam
 Angle from Gravity: 90
-Processed Time: 16/07/2026 14:27:13
-Notes: on beam only
+Processed Time: 21/07/2026 15:39:17
+Notes: 
 
 Force Sensor Filename: 2026-07-15_11-25-22_FT47397.csv
 
@@ -15,14 +16,17 @@ IMU Filename: 20260715_112520_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
 mass   : 2.110500
 
 -------------------- CONTACT DATA --------------------
@@ -30,7 +34,7 @@ mass   : 2.110500
 CONTACT 1
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.100000
+s       : 0.900000
 gravity : 6.305746
 c       : 1.000000
 
@@ -45,7 +49,7 @@ Adjoint Matrix (6x6):
 CONTACT 2
 -----------------------------------------------------
 f_d     : 450.000000
-s       : 0.100000
+s       : 0.900000
 gravity : 7.514896
 c       : 1.000000
 
@@ -58,15 +62,26 @@ Adjoint Matrix (6x6):
   -0.215698   0.000000  -0.000010   0.000000  -1.000000   0.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 16
+---- Any Motion ----
+Number of Motion Events      : 7
 
-True Positive Events             : 2
-True Positive Rate               : 12.50 %
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
 
-Mean W Margin                   : 6.493863
-W Margin STDDEV                 : 18.912366 %
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
 
-Average Optimisation Frequency   : 251.92 Hz
-Average Loop Time                : 3.970 ms
+---- Full Detachment ----
+Number of Detachment Events      : 5
+
+True Positive Events             : 0
+True Positive Rate               : 0.00 %
+
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 402.07 Hz
+Average Loop Time                : 2.487 ms
 
 ==================== END OF REPORT ====================

@@ -112,6 +112,9 @@ function [mask_start,mask_end] = getMasks(linThreshold,gyrThreshold,imuData,W_ma
         mask_start = getMagMask(linThreshold,gyrThreshold,imuData,W_mask);
         W_mask = ones(height(W_mask));
         mask_end = getMagMask(linThreshold_e,gyrThreshold_e,imuData,W_mask);
+    elseif strcmp(method,'roll')
+        mask_start = getRollMask(linThreshold,gyrThreshold,imuData,W_mask);
+        mask_end = mask_start;
     end
 
 end
@@ -148,4 +151,165 @@ function mask = getMagMask(linThreshold,gyrThreshold,imuData,W_mask)
     mask.GyrY = mask.Gyr;
     mask.GyrZ = mask.Gyr;
 
+end
+
+function mask = getRollMask(linThreshold,gyrThreshold,imuData,W_mask)
+
+    mask = table();
+
+    % Get mask where rolling average deviates
+    % Get rolling average in window
+    window = 5;
+    rollLinThreshold = 0.04;
+    rollGyrThreshold = 0.002;
+    cut = 10;
+    maskStartEnd = [false(cut,1); true(length(imuData.Time)-(2*cut),1);false(cut,1)];
+
+    % Get change in rolling average
+    dataLin = imuData.linX.^2+imuData.linY.^2+imuData.linZ.^2;
+    dataLin = dataLin .* maskStartEnd;
+    rollingAvgLin = movmean(dataLin, [0 window-1], 'Endpoints', 'discard');
+
+
+    dataGyr = imuData.gyrX.^2+imuData.gyrY.^2+imuData.gyrZ.^2;
+    dataGyr = dataGyr .* maskStartEnd;
+    rollingAvgGyr = movmean(dataGyr, [0 window-1], 'Endpoints', 'discard');
+
+    % create mask for when motion is detected:
+    motionMaskLin = rollingAvgLin > rollLinThreshold;
+    motionMaskLin = [false(window-2,1); motionMaskLin; false(window-4,1)];
+
+    motionMaskGyr = rollingAvgGyr > rollGyrThreshold;
+    motionMaskGyr = [false(window-2,1); motionMaskGyr; false(window-4,1)];
+
+    % check each segment reaches the threshold:
+    mask.Time = imuData.Time;
+
+    mask.Lin = keepMotionPeaks(motionMaskLin,dataLin,linThreshold,W_mask);
+    mask.Gyr = keepMotionPeaks(motionMaskGyr,dataGyr,gyrThreshold,W_mask);
+
+    mask.LinX = mask.Lin;
+    mask.LinY = mask.Lin;
+    mask.LinZ = mask.Lin;
+
+    mask.GyrX = mask.Gyr;
+    mask.GyrY = mask.Gyr;
+    mask.GyrZ = mask.Gyr;
+
+    %% Plot linear motion detection
+
+    % figure;
+
+    % % Align rolling average with original data length
+    % rollingAvgLinPlot = [nan(window-2,1); rollingAvgLin; nan(1,1)];
+
+    % subplot(3,1,1)
+    % plot(imuData.Time, dataLin, 'k')
+    % hold on
+    % yline(linThreshold, 'r--', 'Peak Threshold')
+    % ylabel('Linear magnitude')
+    % title('Raw linear acceleration magnitude')
+    % grid on
+
+    % subplot(3,1,2)
+    % plot(imuData.Time, dataLin, 'Color', [0.7 0.7 0.7])
+    % hold on
+    % plot(imuData.Time, rollingAvgLinPlot, 'b', 'LineWidth', 1.5)
+    % yline(rollLinThreshold, 'r--', 'Rolling Threshold')
+    % ylabel('Magnitude')
+    % title('Rolling average detection')
+    % legend('Raw','Rolling average')
+    % grid on
+
+    % subplot(3,1,3)
+    % plot(imuData.Time, motionMaskLin, 'b')
+    % hold on
+    % plot(imuData.Time, mask.Lin, 'r', 'LineWidth', 1.5)
+    % ylabel('Mask')
+    % xlabel('Time')
+    % title('Motion mask before and after peak filtering')
+    % legend('Initial mask','Final mask')
+    % ylim([-0.1 1.1])
+    % grid on
+
+    % %% Plot gyro motion detection
+
+    % figure;
+
+    % rollingAvgGyrPlot = [nan(window-2,1); rollingAvgGyr; nan(1,1)];
+
+    % subplot(3,1,1)
+    % plot(imuData.Time, dataGyr, 'k')
+    % hold on
+    % yline(gyrThreshold, 'r--', 'Peak Threshold')
+    % ylabel('Gyro magnitude')
+    % title('Raw gyro magnitude')
+    % grid on
+
+    % subplot(3,1,2)
+    % plot(imuData.Time, dataGyr, 'Color', [0.7 0.7 0.7])
+    % hold on
+    % plot(imuData.Time, rollingAvgGyrPlot, 'b', 'LineWidth', 1.5)
+    % yline(rollGyrThreshold, 'r--', 'Rolling Threshold')
+    % ylabel('Magnitude')
+    % title('Rolling average detection')
+    % legend('Raw','Rolling average')
+    % grid on
+
+    % subplot(3,1,3)
+    % plot(imuData.Time, motionMaskGyr, 'b')
+    % hold on
+    % plot(imuData.Time, mask.Gyr, 'r', 'LineWidth', 1.5)
+    % ylabel('Mask')
+    % xlabel('Time')
+    % title('Motion mask before and after peak filtering')
+    % legend('Initial mask','Final mask')
+    % ylim([-0.1 1.1])
+    % grid on
+
+    %keyboard
+
+end
+
+function filteredMask = keepMotionPeaks(motionMask, data, Threshold, W_mask)
+% keepMotionPeaks Keeps motion regions that contain a peak above threshold
+%
+% Inputs:
+%   motionMask : logical vector, true where motion occurs
+%   data       : numeric vector containing values used for peak detection
+%   Threshold  : minimum peak value required to keep a motion segment
+%
+% Output:
+%   filteredMask : logical vector, same size as motionMask
+
+    % Check inputs
+    if ~islogical(motionMask)
+        error('motionMask must be a logical array');
+    end
+    
+    if length(motionMask) ~= length(data)
+        error('motionMask and data must be the same length');
+    end
+
+    % Initialise output
+    filteredMask = false(size(motionMask));
+
+    % Find continuous true regions
+    edges = diff([false; motionMask(:); false]);
+    starts = find(edges == 1);
+    ends = find(edges == -1) - 1;
+
+    maskStart = W_mask(starts);
+
+    starts = starts(maskStart);
+    ends = ends(maskStart);
+
+    % Keep regions containing a sufficient peak
+    for i = 1:length(starts)
+        idx = starts(i):ends(i);
+
+        if max(data(idx)) >= Threshold
+            filteredMask(idx) = true;
+        end
+    end
 end

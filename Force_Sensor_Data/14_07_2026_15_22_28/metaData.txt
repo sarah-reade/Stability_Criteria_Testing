@@ -4,8 +4,9 @@ ID: 12
 Number of Contacts: 2
 Configuration: flat
 EM Configuration: off-off
+Surface: floor
 Angle from Gravity: 0
-Processed Time: 15/07/2026 14:39:28
+Processed Time: 21/07/2026 15:38:00
 Notes: 
 
 Force Sensor Filename: 2026-07-14_15-22-28_FT47397.csv
@@ -15,15 +16,18 @@ IMU Filename: 20260714_152226_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
-r_x    : 0.009625
-r_y    : 0.009625
-r_eff  : 0.770000
-mass   : 1.332000
+r_x    : 0.038500
+r_y    : 0.038500
+r_eff  : 0.038500
+mass   : 1.998000
 
 -------------------- CONTACT DATA --------------------
 
@@ -58,15 +62,26 @@ Adjoint Matrix (6x6):
   -0.349448  -0.005194   0.000000   0.000000   0.000000   1.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 10
+---- Any Motion ----
+Number of Motion Events      : 9
 
-True Positive Events             : 10
+True Positive Events             : 9
 True Positive Rate               : 100.00 %
 
-Mean W Margin                   : 6.757455
-W Margin STDDEV                 : 7.365619 %
+Mean W Margin                   : 2.373352
+W Margin STDDEV                 : 5.241251 %
 
-Average Optimisation Frequency   : 543.39 Hz
-Average Loop Time                : 1.840 ms
+---- Full Detachment ----
+Number of Detachment Events      : 6
+
+True Positive Events             : 6
+True Positive Rate               : 100.00 %
+
+Mean W Margin                   : 0.913783
+W Margin STDDEV                 : 1.664817 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 447.81 Hz
+Average Loop Time                : 2.233 ms
 
 ==================== END OF REPORT ====================

@@ -75,7 +75,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     wrench = [force,torque];
 
     try 
-        [scriptParameters,motionTimepoints] = find_slips_and_tips(imuData,wrench,parameters.reff,'mag');
+        [scriptParameters,motionTimepoints] = find_slips_and_tips(imuData,wrench,parameters.reff,'roll');
         scriptParameters.hz = targetRate;
     catch ME
         msg = sprintf(['Failed to detect slips and trips:\n\n%s\n\n' ...

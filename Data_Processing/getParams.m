@@ -59,7 +59,7 @@ function parameters = getParams(config,angle,emconfig,surface)
 
     c = 1.0;
     p_magnet = 450;
-    em_magnet = 1400;
+    em_magnet = 390;
 
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
@@ -172,6 +172,10 @@ function parameters = getParams(config,angle,emconfig,surface)
         trans = [-44.0290 37.3830 -88.7095]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
+
+        if strcmp(angle,'180')
+            angle = '90V';
+        end
     end
     
     g_base = [0.0,0.0,-9.81];
@@ -196,6 +200,9 @@ function parameters = getParams(config,angle,emconfig,surface)
 
     %print_parameters(parameters);
     parameters.m = parameters.m*1.5;
+    % plotConfigTFs(parameters);
+    % drawnow;
+    % keyboard;
     
 end
 
@@ -256,4 +263,114 @@ end
 function out = parseOnOff(s)
     parts = split(string(s), "-");
     out = double(parts == "on");
+end
+
+
+
+function plotConfigTFs(parameters)
+% plotConfigTFs Plot sensor and contact transformation frames
+%
+% Input:
+%   parameters - output from getParams()
+
+    figure;
+    hold on;
+    grid on;
+    axis equal;
+
+    xlabel('X (m)')
+    ylabel('Y (m)')
+    zlabel('Z (m)')
+    title('Configuration Transformation Frames')
+
+    % Plot sensor frame
+    plotFrame(eye(3), [0 0 0], 'Sensor');
+
+    colours = lines(length(parameters.G));
+
+    % Plot contact frames
+    for i = 1:length(parameters.G)
+
+        G = parameters.G{i};
+
+        % Extract rotation
+        R = G(1:3,1:3);
+
+        % Recover translation from G matrix
+        p_skew = G(4:6,1:3) * R';
+
+        p = [
+            p_skew(3,2)
+            p_skew(1,3)
+            p_skew(2,1)
+        ];
+
+        plotFrame(R, p, sprintf('Contact %d',i), colours(i,:));
+
+        % Draw line from sensor to contact
+        plot3([0 p(1)], ...
+              [0 p(2)], ...
+              [0 p(3)], ...
+              '--', ...
+              'Color', colours(i,:));
+    end
+
+    % Plot gravity vector
+    if isfield(parameters,'gravity')
+
+        g = parameters.gravity(1:3);
+
+        quiver3(0,0,0,...
+            g(1),g(2),g(3),...
+            0.05,...
+            'k',...
+            'LineWidth',2,...
+            'DisplayName','Gravity');
+
+    end
+
+
+    view(3);
+    legend('Location','best');
+
+end
+
+
+function plotFrame(R,p,label,c)
+
+    if nargin < 4
+        c = 'k';
+    end
+
+    scale = 0.05;
+
+    quiver3(p(1),p(2),p(3),...
+        R(1,1)*scale,...
+        R(2,1)*scale,...
+        R(3,1)*scale,...
+        0,...
+        'Color','r',...
+        'LineWidth',2);
+
+    quiver3(p(1),p(2),p(3),...
+        R(1,2)*scale,...
+        R(2,2)*scale,...
+        R(3,2)*scale,...
+        0,...
+        'Color','g',...
+        'LineWidth',2);
+
+    quiver3(p(1),p(2),p(3),...
+        R(1,3)*scale,...
+        R(2,3)*scale,...
+        R(3,3)*scale,...
+        0,...
+        'Color','b',...
+        'LineWidth',2);
+
+
+    text(p(1),p(2),p(3),['  ' label],...
+        'Color',c,...
+        'FontSize',10);
+
 end

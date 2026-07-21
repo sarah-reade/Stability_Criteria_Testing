@@ -6,7 +6,7 @@ Configuration: single
 EM Configuration: on
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 16/07/2026 15:21:19
+Processed Time: 21/07/2026 15:39:43
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-23-22_FT47397.csv
@@ -16,8 +16,11 @@ IMU Filename: 20260715_142329_IMULog.csv
 ---------------- SCRIPT PARAMETERS -----------------
 hz    : 10.000000
 ---------- IMU Thresholds:
-linThreshold      : 1.0000000000
-gyrThreshold      : 0.0600000000
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 10.0000000000
 refractoryPeriod  : 0.8000000000
 -------------- OPTIMISATION PARAMETERS ------------
 mu     : 1.000000
@@ -44,15 +47,26 @@ Adjoint Matrix (6x6):
    0.000000   0.000000   0.000000   0.000000   0.000000   1.000000
 
 --------------- POST PROCESSING RESULTS ---------------
-Number of Detachment Events      : 14
+---- Any Motion ----
+Number of Motion Events      : 7
 
-True Positive Events             : 0
-True Positive Rate               : 0.00 %
+True Positive Events             : 1
+True Positive Rate               : 14.29 %
 
-Mean W Margin                   : 11.477378
-W Margin STDDEV                 : 16.443859 %
+Mean W Margin                   : 3.364260
+W Margin STDDEV                 : 8.900996 %
 
-Average Optimisation Frequency   : 686.24 Hz
-Average Loop Time                : 1.457 ms
+---- Full Detachment ----
+Number of Detachment Events      : 7
+
+True Positive Events             : 1
+True Positive Rate               : 14.29 %
+
+Mean W Margin                   : 3.364260
+W Margin STDDEV                 : 8.900996 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 738.57 Hz
+Average Loop Time                : 1.354 ms
 
 ==================== END OF REPORT ====================
