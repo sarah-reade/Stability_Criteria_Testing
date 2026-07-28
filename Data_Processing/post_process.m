@@ -43,6 +43,9 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
     ppdata.detached_count = 0;
     ppdata.true_positive_count = 0;
     ppdata.w_margin = 0;
+    ppdata.countFz = 0;
+    ppdata.countTip = 0;
+    ppdata.countFric = 0;
 
     %% ---------------- Extract signals ----------------
     t = data.time;
@@ -53,6 +56,7 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
     detached_start = [];
     detached_end = [];
 
+
     for i = 2:n
         % 1 -> 0 : entering detached state
         if attached(i-1) == 1 && attached(i) == 0
@@ -60,6 +64,16 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
             
         if any(gamma(max(1,i-3):min(n,i+3)) <= g_margin)
             ppdata.true_positive_count = ppdata.true_positive_count + 1;
+            trigger = getLowestGammaTrigger(data, i);
+
+            switch trigger
+                case "Fz"
+                    ppdata.countFz = ppdata.countFz + 1;
+                case "Tip"
+                    ppdata.countTip = ppdata.countTip + 1;
+                case "Fric"
+                    ppdata.countFric = ppdata.countFric + 1;
+            end
         end
         
         % 0 -> 1 : exiting detached state
@@ -145,4 +159,35 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
     %% Average required margin
     ppdata.w_margin = mean(w_margin_values);
     ppdata.w_margin_std = std(w_margin_values);
+end
+
+function trigger = getLowestGammaTrigger(data, i)
+
+    % Determine number of contacts from column names
+    vars = data.Properties.VariableNames;
+    nc = sum(startsWith(vars, 'gamma_z_'));
+
+    values = zeros(nc,3);
+
+    for c = 1:nc
+        values(c,1) = data.(sprintf('gamma_z_%d', c))(i);
+        values(c,2) = data.(sprintf('gamma_tip_%d', c))(i);
+        values(c,3) = data.(sprintf('gamma_fric_%d', c))(i);
+    end
+
+    % Find minimum value
+    [~, idx] = min(values(:));
+
+    % Convert linear index back to contact and type
+    [~, triggerType] = ind2sub(size(values), idx);
+
+    % Return name
+    switch triggerType
+        case 1
+            trigger = "Fz";
+        case 2
+            trigger = "Tip";
+        case 3
+            trigger = "Fric";
+    end
 end

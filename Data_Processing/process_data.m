@@ -62,6 +62,9 @@ for selectionIdx = 1:numel(selectedIdxs)
     try
         % Parse sample rate, sensor channels, and metadata from selected CSV.
         [imuData,imuRawData] = readFilterIMUCsv(imucsvPath,time);
+        start = imuData.Time(1);
+        imuData.Time = imuData.Time - start;
+        time = time - start;
     catch ME
         msg = sprintf(['Failed to load IMU CSV:\n\n%s\n\n' ...
                     'Function: %s\nLine: %d'], ...
@@ -91,7 +94,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     nc = numel(parameters.c);
     variables = zeros(height(wrench),nc*6 + 1);
     beta = zeros(height(wrench),1);
-    all_beta = zeros(height(wrench),4,nc);
+    all_beta = zeros(height(wrench),3,nc);
     loop_time = zeros(height(wrench),1);
 
     try 
@@ -114,7 +117,7 @@ for selectionIdx = 1:numel(selectedIdxs)
     gamma_out = beta;
     
     try 
-        outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters);
+        outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,all_beta,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters);
 
     catch ME
         msg = sprintf(['Failed to save data:\n\n%s\n\n' ...

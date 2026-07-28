@@ -219,22 +219,21 @@ function [beta, all_beta] = get_beta(x, parameters)
         % Linear inequality bounds
         % -------------------------
         b1 = Fa(i) + fz;
-        b2 = Fa(i) + fz - (2/r_x)*abs(mx);
-        b3 = Fa(i) + fz - (2/r_y)*abs(my);
+        b2 = Fa(i) + fz - sqrt(((2/r_x)*abs(mx))^2 + ((2/r_y)*abs(my))^2);
 
 
         % -------------------------
         % SOC bound
         % -------------------------
-        b4 = mu*(fz + Fa(i)) - sqrt(fx^2 + fy^2 + (mz/reff)^2);
+        b3 = mu*(fz + Fa(i)) - sqrt(fx^2 + fy^2 + (mz/reff)^2);
 
         % -------------------------
         % Contact beta
         % -------------------------
-        beta_i = min([b1 b2 b3 b4]);
+        beta_i = min([b1 b2 b3]);
 
         beta_vals = [beta_vals; beta_i];
-        all_beta(:,i) = [b1 b2 b3 b4];
+        all_beta(:,i) = [b1 b2 b3];
 
     end
 

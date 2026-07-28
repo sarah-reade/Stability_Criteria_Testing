@@ -22,6 +22,9 @@ lt = {};
 true_positive = [];
 detached_count = [];
 true_positive_count = [];
+fz_count = [];
+tip_count = [];
+fric_count = [];
 
 w_margin = [];
 w_margin_std = [];
@@ -52,6 +55,10 @@ for i = 1:numel(files)
     tp = extractNumeric(txt,'True Positive Rate',subheading);
     tpc = extractNumeric(txt,'True Positive Events',subheading);
 
+    fz_c = extractNumeric(txt,'Fz Count',subheading);
+    tip_c = extractNumeric(txt,'Tip Count',subheading);
+    fric_c = extractNumeric(txt,'Fric Count',subheading);
+
     wm = extractNumeric(txt,'Mean W Margin',subheading);
     wms = extractNumeric(txt,'W Margin STDDEV',subheading);
 
@@ -71,6 +78,9 @@ for i = 1:numel(files)
     true_positive(end+1,1) = tp;
     detached_count(end+1,1) = dc;
     true_positive_count(end+1,1) = tpc;
+    fz_count(end+1,1) = fz_c;
+    tip_count(end+1,1) = tip_c;
+    fric_count(end+1,1) = fric_c;
 
     w_margin(end+1,1) = wm;
     w_margin_std(end+1,1) = wms;
@@ -80,8 +90,10 @@ end
 % RAW TABLE
 % =========================
 rawTable = table(layout, angle, em, surface, true_positive,detached_count,true_positive_count,w_margin, w_margin_std, lt, ...
+    fz_count,tip_count,fric_count,...
     'VariableNames', {'Configuration','Angle','EM_Config', 'Surface', ...
-                      'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+                      'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
+                      'FzCount','TipCount','FricCount'});
 
 % =========================
 % AGGREGATE
@@ -113,10 +125,11 @@ function outputTable = aggregateGroups(rawTable)
 
     outputTable = table(L(:), A(:), E(:), S(:), ...
                         'VariableNames', {'Configuration','Angle','EM_Config','Surface'});
-    outputTableData = table('Size',[0 6], ...
-    'VariableTypes',{'double','double','double','double','double','double'}, ...
+    outputTableData = table('Size',[0 9], ...
+    'VariableTypes',{'double','double','double','double','double','double','double','double','double'}, ...
     'VariableNames',{'TruePositiveRate','DetachmentCount','TruePositiveCount',...
-                     'WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+                     'WrenchMargin','WrenchMarginStd','LoopTime_ms',...
+                      'FzCount','TipCount','FricCount'});
 
     %% loop all raw data and aggregate information
     for i = 1:size(outputTable,1)
@@ -169,8 +182,9 @@ function output = combineResults(data,mask)
     mask = mask & ~isnan(data.DetachmentCount) & data.DetachmentCount ~= 0;
 
     if all(mask == 0)
-        output = table(NaN, NaN, NaN, NaN, NaN, NaN, ...
-                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+        output = table(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, ...
+                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
+                      'FzCount','TipCount','FricCount'});
         return;
     end
 
@@ -182,9 +196,17 @@ function output = combineResults(data,mask)
     true_positive_count = sum(data.TruePositiveCount);
     if detach_count ~= 0
         true_positive_rate = 100*true_positive_count/detach_count;
+        fz_percent = 100*sum(data.FzCount)/true_positive_count;
+        tip_percent = 100*sum(data.TipCount)/true_positive_count;
+        fric_percent = 100*sum(data.FricCount)/true_positive_count;
     else
         true_positive_rate = NaN;
+        fz_percent =  NaN;
+        tip_percent =  NaN;
+        fric_percent =  NaN;
     end
+
+
 
     w_margin_sum = 0;
     w_margin_std_sum = 0;
@@ -209,7 +231,9 @@ function output = combineResults(data,mask)
     
 
     output = table(true_positive_rate, detach_count, true_positive_count, w_margin, w_margin_std, loop_time, ...
-                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms'});
+                    fz_percent, tip_percent, fric_percent, ...
+                    'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
+                      'FzCount','TipCount','FricCount'});
     
 
 end
@@ -250,6 +274,7 @@ end
 function table = cleanTable(inputTable)
     table = rmmissing(inputTable, 'DataVariables', ...
     {'TruePositiveRate', 'DetachmentCount', 'TruePositiveCount', ...
-     'WrenchMargin', 'WrenchMarginStd', 'LoopTime_ms'});
+     'WrenchMargin', 'WrenchMarginStd', 'LoopTime_ms',...
+     'FzCount','TipCount','FricCount'});
 
 end

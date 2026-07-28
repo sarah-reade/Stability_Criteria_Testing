@@ -1,11 +1,11 @@
-function outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters)
+function outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma_out,all_beta,motionTimepoints,loop_time,parameters,selectedRecord,scriptParameters)
     datetime_string = csvMeta.startTime;
     datetime_string = replace(datetime_string, [" ", "/", ":"], "_");
     outDir = make_directory(datetime_string,overwrite);
     
     
     export_sensor_dataset_csv( outDir, ...
-       time,wrench,imuData,variables,gamma_out,motionTimepoints,loop_time);
+       time,wrench,imuData,variables,gamma_out,all_beta,motionTimepoints,loop_time);
     
     ppdata = post_process(outDir+"/data.csv",parameters.reff,10,10);
 
@@ -34,7 +34,7 @@ end
 
 
 function export_sensor_dataset_csv( outDir, ...
-    time,wrenchData,imuData,optimised_variables,gamma,motionTimepoints,loop_time)
+    time,wrenchData,imuData,optimised_variables,gamma,all_beta,motionTimepoints,loop_time)
 
 
     % Build a flat CSV that preserves the processed signals and optimisation output.
@@ -74,6 +74,11 @@ function export_sensor_dataset_csv( outDir, ...
         T.(sprintf('Taux_%d', i)) = optimised_variables(:,k*6+4);
         T.(sprintf('Tauy_%d', i)) = optimised_variables(:,k*6+5);
         T.(sprintf('Tauz_%d', i)) = optimised_variables(:,k*6+6);
+
+
+        T.(sprintf('gamma_z_%d', i))    = all_beta(:,1,i);
+        T.(sprintf('gamma_tip_%d', i))  = all_beta(:,2,i);
+        T.(sprintf('gamma_fric_%d', i)) = all_beta(:,3,i);
     end
 
     T.gamma = gamma;
@@ -226,6 +231,11 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, 'True Positive Events             : %d\n', ppdata.securelyAttached.true_positive_count);
     fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.securelyAttached.true_positive);
     fprintf(fid, '\n');
+    fprintf(fid, 'Trigger Counts:\n');
+    fprintf(fid, '  Fz Count                         : %d\n', ppdata.securelyAttached.countFz);
+    fprintf(fid, '  Tip Count                        : %d\n', ppdata.securelyAttached.countTip);
+    fprintf(fid, '  Fric Count                       : %d\n', ppdata.securelyAttached.countFric);
+    fprintf(fid, '\n');
 
     fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.securelyAttached.w_margin);
     fprintf(fid, 'W Margin STDDEV                 : ');
@@ -238,6 +248,11 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '\n');
     fprintf(fid, 'True Positive Events             : %d\n', ppdata.attached.true_positive_count);
     fprintf(fid, 'True Positive Rate               : %.2f %%\n', ppdata.attached.true_positive);
+    fprintf(fid, '\n');
+    fprintf(fid, 'Trigger Counts:\n');
+    fprintf(fid, '  Fz Count                         : %d\n', ppdata.attached.countFz);
+    fprintf(fid, '  Tip Count                        : %d\n', ppdata.attached.countTip);
+    fprintf(fid, '  Fric Count                       : %d\n', ppdata.attached.countFric);
     fprintf(fid, '\n');
 
     fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.attached.w_margin);
