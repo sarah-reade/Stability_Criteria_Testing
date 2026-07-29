@@ -1,7 +1,7 @@
 function outputTable = build_results_table(rootDir,detachSeverity)
 % Builds dataset + provides filtering + aggregation utilities
 if nargin < 2
-    detachSeverity = "Motion";
+    detachSeverity = "Motion"; % alternative is Detachment
 end
 
 if nargin < 1
@@ -93,7 +93,7 @@ rawTable = table(layout, angle, em, surface, true_positive,detached_count,true_p
     fz_count,tip_count,fric_count,...
     'VariableNames', {'Configuration','Angle','EM_Config', 'Surface', ...
                       'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
-                      'FzCount','TipCount','FricCount'});
+                      'FzPercent','TipPercent','FricPercent'});
 
 % =========================
 % AGGREGATE
@@ -129,7 +129,7 @@ function outputTable = aggregateGroups(rawTable)
     'VariableTypes',{'double','double','double','double','double','double','double','double','double'}, ...
     'VariableNames',{'TruePositiveRate','DetachmentCount','TruePositiveCount',...
                      'WrenchMargin','WrenchMarginStd','LoopTime_ms',...
-                      'FzCount','TipCount','FricCount'});
+                      'FzPercent','TipPercent','FricPercent'});
 
     %% loop all raw data and aggregate information
     for i = 1:size(outputTable,1)
@@ -184,7 +184,7 @@ function output = combineResults(data,mask)
     if all(mask == 0)
         output = table(NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, ...
                     'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
-                      'FzCount','TipCount','FricCount'});
+                      'FzPercent','TipPercent','FricPercent'});
         return;
     end
 
@@ -196,9 +196,9 @@ function output = combineResults(data,mask)
     true_positive_count = sum(data.TruePositiveCount);
     if detach_count ~= 0
         true_positive_rate = 100*true_positive_count/detach_count;
-        fz_percent = 100*sum(data.FzCount)/true_positive_count;
-        tip_percent = 100*sum(data.TipCount)/true_positive_count;
-        fric_percent = 100*sum(data.FricCount)/true_positive_count;
+        fz_percent = 100*sum(data.FzPercent)/true_positive_count;
+        tip_percent = 100*sum(data.TipPercent)/true_positive_count;
+        fric_percent = 100*sum(data.FricPercent)/true_positive_count;
     else
         true_positive_rate = NaN;
         fz_percent =  NaN;
@@ -233,7 +233,7 @@ function output = combineResults(data,mask)
     output = table(true_positive_rate, detach_count, true_positive_count, w_margin, w_margin_std, loop_time, ...
                     fz_percent, tip_percent, fric_percent, ...
                     'VariableNames', {'TruePositiveRate','DetachmentCount','TruePositiveCount','WrenchMargin','WrenchMarginStd','LoopTime_ms',...
-                      'FzCount','TipCount','FricCount'});
+                      'FzPercent','TipPercent','FricPercent'});
     
 
 end
@@ -275,6 +275,6 @@ function table = cleanTable(inputTable)
     table = rmmissing(inputTable, 'DataVariables', ...
     {'TruePositiveRate', 'DetachmentCount', 'TruePositiveCount', ...
      'WrenchMargin', 'WrenchMarginStd', 'LoopTime_ms',...
-     'FzCount','TipCount','FricCount'});
+     'FzPercent','TipPercent','FricPercent'});
 
 end

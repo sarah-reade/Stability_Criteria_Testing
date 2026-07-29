@@ -19,15 +19,15 @@ barColours = [
     0.6863 0.7961 0.7843   % #afcbc8
     0.7020 0.3373 0.0275   % #b35607
     0.8549 0.7412 0.7451   % #dabdbe
-    0.4431 0.3451 0.3451   % #715858
+    0.4314 0.1804 0.2353   % #6e2e3c
     0.9216 0.8902 0.8941   % #ebe3e4
     0.4784 0.5647 0.6314   % #7a90a1
     0.9255 0.7608 0.4627   % #ecc276
     0.8157 0.6314 0.6392   % #d0a1a3
     0.8549 0.8353 0.8627   % #dad5dc
-    0.4314 0.1804 0.2353   % #6e2e3c
-    0.4314 0.1804 0.2353   % #6e2e3c
-    0.4314 0.1804 0.2353   % #6e2e3c
+    0.4431 0.3451 0.3451   % #715858
+    0.4314 0.6078 0.5529   % #6e9b8d (muted teal-green)
+    0.6784 0.5765 0.7608   % #ad93c2 (muted purple)
 ];
 
 
@@ -238,7 +238,7 @@ ylabel('True Positive Rate (%)', ...
 
 
 legend(categories(categorical(t.(compareVar))), ...
-       'Location','best', ...
+       'Location','northeast', ...
        'FontSize',fontSize, ...
        'FontName',fontName)
 
@@ -251,7 +251,6 @@ grid on
 ax = gca;
 ax.FontSize = fontSize;
 ax.FontName = fontName;
-ax.XLim = configs;
 
 hold off
 
@@ -262,6 +261,7 @@ end
 
 
 function plot_TPR_configuration(all_results, configs, barColours)
+
 
 % ===========================
 % Plot settings
@@ -281,16 +281,24 @@ t = all_results( ...
     strcmp(all_results.EM_Config,"all") & ...
     ~strcmp(all_results.Angle,"all"), :);
 
-
+summary(t);
 % Average TPR over angles
 T = groupsummary(t, ...
     'Configuration', ...
     'mean', ...
-    'TruePositiveRate');
+    {'TruePositiveRate','FzPercent','TipPercent','FricPercent'});
 
+summary(T);
 
 % Preserve configuration order
 T.Configuration = categorical(T.Configuration, configs, 'Ordinal', true);
+
+% Convert percentage split into stacked bar heights
+Y = [
+    T.mean_TruePositiveRate .* T.mean_FzPercent  / 100, ...
+    T.mean_TruePositiveRate .* T.mean_TipPercent / 100, ...
+    T.mean_TruePositiveRate .* T.mean_FricPercent/ 100
+];
 
 
 % ===========================
@@ -299,56 +307,89 @@ T.Configuration = categorical(T.Configuration, configs, 'Ordinal', true);
 
 figure
 
-b = bar(T.Configuration, ...
-        T.mean_TruePositiveRate, ...
-        'BarWidth', 0.9);
-
-
-b.FaceColor = 'flat';
-
-% Apply colours
-for k = 1:numel(T.mean_TruePositiveRate)
-    b.CData(k,:) = barColours(mod(k-1,size(barColours,1))+1,:);
-end
-
-
-% ===========================
-% Add values / missing markers
-% ===========================
+b = bar(T.Configuration, Y, ...
+    'stacked', ...
+    'BarWidth', 0.9);
 
 hold on
 
-x = b.XEndPoints;
-y = b.YEndPoints;
+% Colours for each mechanism
+b(1).FaceColor = barColours(1,:);
+b(2).FaceColor = barColours(2,:);
+b(3).FaceColor = barColours(3,:);
 
-for k = 1:numel(y)
+legend({'Fz','Tipping','Friction'}, ...
+    'Location','northeast');
 
-    if isnan(y(k)) || y(k) == 0
+ylabel('True Positive Rate (%)')
 
-        % Marker line just above axis
-        plot(x(k), 0.75, 'k_', ...
-            'MarkerSize', 20, ...
-            'LineWidth', 1.5)
+% ===========================
+% Add labels
+% ===========================
 
-        if isnan(y(k))
-            label = 'N/A';
-        else
-            label = '0.0';
+% Total height of each bar (= TPR)
+barTotal = sum(Y,2);
+
+% Original percentages
+splitPct = [ ...
+    T.mean_FzPercent, ...
+    T.mean_TipPercent, ...
+    T.mean_FricPercent];
+
+for k = 1:height(T)
+
+    % x-location of this bar
+    x = b(1).XEndPoints(k);
+
+    %----------------------------------
+    % Percent labels inside each segment
+    %----------------------------------
+    yBottom = 0;
+
+    for s = 1:3
+
+        h = Y(k,s);
+
+        if h > 0
+
+            text(x, ...
+                yBottom + h/2, ...
+                sprintf('%.0f%%', splitPct(k,s)), ...
+                'HorizontalAlignment','center', ...
+                'VerticalAlignment','middle', ...
+                'FontSize',fontSize-1, ...
+                'FontName',fontName);
+
         end
 
-        text(x(k), 5, label, ...
+        yBottom = yBottom + h;
+
+    end
+
+    %----------------------------------
+    % Overall TPR label / missing marker
+    %----------------------------------
+    if barTotal(k) == 0
+
+        % Missing marker
+        plot(x,0.75,'k_', ...
+            'MarkerSize',20, ...
+            'LineWidth',1.5);
+
+        text(x,5,'0.0', ...
             'HorizontalAlignment','center', ...
             'FontSize',fontSize, ...
-            'FontName',fontName)
+            'FontName',fontName);
 
     else
 
-        text(x(k), y(k)+0.5, ...
-            sprintf('%.1f%%', y(k)), ...
+        text(x, ...
+            barTotal(k)+0.5, ...
+            sprintf('%.1f%%',T.mean_TruePositiveRate(k)), ...
             'HorizontalAlignment','center', ...
             'VerticalAlignment','bottom', ...
             'FontSize',fontSize, ...
-            'FontName',fontName)
+            'FontName',fontName);
 
     end
 
