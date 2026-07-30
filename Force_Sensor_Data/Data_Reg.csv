@@ -3,7 +3,6 @@ ID,Force Sensor Filename,IMU Filename,Configuration,Angle from Gravity,EM Config
 2,2026-07-07_19-09-37_FT47397,20260707_190934_IMULog,flat,90V,off-off,shelf,na
 3,2026-07-08_11-50-13_FT47397,20260708_115009_IMULog,flat,0,off-off,floor,
 4,2026-07-08_11-58-29_FT47397,20260708_115826_IMULog,flat,180,off-off,shelf,
-5,2026-07-14_12-41-21_FT47397,20260714_124119_IMULog,flat,180,off-off,shelf,
 6,2026-07-14_13-09-25_FT47397,20260714_130903-IMULog,flat,180,on-on,shelf,
 7,2026-07-14_14-52-02_FT47397,20260714_145201_IMULog,flat,90,off-off,shelf,flip
 8,2026-07-14_14-54-13_FT47397,20260714_145413_IMULog,flat,90,on-on,shelf,loose em cable flip

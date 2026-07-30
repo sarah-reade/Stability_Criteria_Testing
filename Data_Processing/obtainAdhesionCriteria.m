@@ -1,6 +1,19 @@
-function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(parameters,wrench)
-    [variables,gamma_cnstr] = obtain_gamma_cnstr(parameters,wrench);
-    [beta,all_beta] = get_beta(variables,parameters);
+function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(parameters,wrench,method)
+    if nargin < 3
+        method = 'fullopt';
+    end
+    
+    switch method
+        case 'fullopt'
+            [variables,gamma_cnstr] = obtain_gamma_cnstr(parameters,wrench);
+            [beta,all_beta] = get_beta(variables,parameters);
+        case 'quadraticprog'
+
+        case 'zml'
+
+        case 'zmlandopt'
+            
+    end
 end
 
 

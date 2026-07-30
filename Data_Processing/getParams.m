@@ -40,10 +40,10 @@ function parameters = getParams(config,angle,emconfig,surface)
         error('Invalid config "%s". Must be one of: flat, RA, single.', config);
     end
 
-    parameters.mu = 1.0;
+    parameters.mu = 0.9;
     r = 0.077;
-    parameters.r_x = r/2;
-    parameters.r_y = r/2;
+    parameters.r_x = r;
+    parameters.r_y = r;
     parameters.reff = r/2;%*10;
 
     m_em = 0.4;
@@ -58,14 +58,14 @@ function parameters = getParams(config,angle,emconfig,surface)
     Gg = zeros(6,6);
 
     c = 1.0;
-    p_magnet = 450;
-    em_magnet = 390;
+    p_magnet = 350;
+    em_magnet = 290;
 
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
         mag_s = 0.9;
     elseif ismember(surface, {'shelf'})
-        mag_s = 0.1;
+        mag_s = 0.05;
     end
 
     if ismember(config, {'flat','RA'})

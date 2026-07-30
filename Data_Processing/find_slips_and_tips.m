@@ -4,8 +4,8 @@ function [params,timestamps] = find_slips_and_tips(imuData,wrench,reff,method)
 
     params.linThreshold = [1.0,4.0] ;
     params.gyrThreshold = [0.06,0.24];
-    params.refractoryPeriod = 0.8;
-    params.wrenchThreshold = 10;
+    params.refractoryPeriod = 0.1;
+    params.wrenchThreshold = 5;
 
 
     linThreshold = params.linThreshold(1);
@@ -58,7 +58,6 @@ function timestamps = getTimepoints(mask,refractoryPeriod)
 
         %% While in motion
         if inMotion
-
             % Still above end threshold -> continue motion
             if motionEnd(maskIdx)
                 endMotionTime = -inf;
@@ -160,8 +159,8 @@ function mask = getRollMask(linThreshold,gyrThreshold,imuData,W_mask)
     % Get mask where rolling average deviates
     % Get rolling average in window
     window = 5;
-    rollLinThreshold = 0.04;
-    rollGyrThreshold = 0.002;
+    rollLinThreshold = [0.04,0.8];
+    rollGyrThreshold = [0.002,0.05];
     cut = 10;
     maskStartEnd = [false(cut,1); true(length(imuData.Time)-(2*cut),1);false(cut,1)];
 
@@ -176,10 +175,10 @@ function mask = getRollMask(linThreshold,gyrThreshold,imuData,W_mask)
     rollingAvgGyr = movmean(dataGyr, [0 window-1], 'Endpoints', 'discard');
 
     % create mask for when motion is detected:
-    motionMaskLin = rollingAvgLin > rollLinThreshold;
+    motionMaskLin = hysteresisThreshold(rollingAvgLin, rollLinThreshold);
     motionMaskLin = [false(window-2,1); motionMaskLin; false(window-4,1)];
 
-    motionMaskGyr = rollingAvgGyr > rollGyrThreshold;
+    motionMaskGyr = hysteresisThreshold(rollingAvgGyr, rollGyrThreshold);
     motionMaskGyr = [false(window-2,1); motionMaskGyr; false(window-4,1)];
 
     % check each segment reaches the threshold:
@@ -267,7 +266,7 @@ function mask = getRollMask(linThreshold,gyrThreshold,imuData,W_mask)
     % ylim([-0.1 1.1])
     % grid on
 
-    %keyboard
+    % keyboard
 
 end
 
@@ -310,6 +309,50 @@ function filteredMask = keepMotionPeaks(motionMask, data, Threshold, W_mask)
 
         if max(data(idx)) >= Threshold
             filteredMask(idx) = true;
+        end
+    end
+end
+
+
+function mask = hysteresisThreshold(data, threshold)
+
+    lower = threshold(1);
+    upper = threshold(2);
+
+    lowMask = data > lower;
+    highMask = data > upper;
+
+    mask = lowMask;
+
+    % Find connected runs of ones in lowMask
+    d = diff([false; lowMask; false]);
+    starts = find(d == 1) + 1;
+    ends   = find(d == -1) - 2;
+    
+    for k = 1:numel(starts)
+
+        s = starts(k);
+        e = ends(k);
+
+        % Only modify the interior of the run
+        if e > s + 1
+            interior = (s):(e);
+
+            % Upper mask can carve holes in the interior
+            % find the runs of zeros
+            highdiff = diff([false;highMask(interior);false]);
+            highstarts = find(highdiff == -1);
+            highends = find(highdiff == 1);
+
+            for l = 1:(numel(highstarts)-1)
+                hs = highstarts(l);
+                he = highends(l+1);
+                
+                if he > hs
+                    interior = (s+hs):(s+he);
+                    mask(interior) = zeros(1,he - hs + 1);
+                end
+            end
         end
     end
 end

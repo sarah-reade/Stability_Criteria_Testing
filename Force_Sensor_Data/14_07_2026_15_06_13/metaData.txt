@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: on-on
 Surface: shelf
 Angle from Gravity: 90V
-Processed Time: 21/07/2026 15:37:41
+Processed Time: 30/07/2026 16:52:25
 Notes: loose mount and em cable
 
 Force Sensor Filename: 2026-07-14_15-06-13_FT47397.csv
@@ -20,12 +20,12 @@ linThresholds    : 1.0000000000 [any motion,full detachment]
 linThresholds    : 4.0000000000 [any motion,full detachment]
 gyrThresholds    : 0.0600000000 [any motion,full detachment]
 gyrThresholds    : 0.2400000000 [any motion,full detachment]
-wrenchThreshold      : 10.0000000000
-refractoryPeriod  : 0.8000000000
+wrenchThreshold      : 5.0000000000
+refractoryPeriod  : 0.1000000000
 -------------- OPTIMISATION PARAMETERS ------------
-mu     : 1.000000
-r_x    : 0.038500
-r_y    : 0.038500
+mu     : 0.900000
+r_x    : 0.077000
+r_y    : 0.077000
 r_eff  : 0.038500
 mass   : 1.998000
 
@@ -33,8 +33,8 @@ mass   : 1.998000
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 840.000000
-s       : 0.100000
+f_d     : 640.000000
+s       : 0.050000
 gravity : 7.514896
 c       : 1.000000
 
@@ -48,8 +48,8 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 840.000000
-s       : 0.100000
+f_d     : 640.000000
+s       : 0.050000
 gravity : -6.305746
 c       : 1.000000
 
@@ -65,11 +65,16 @@ Adjoint Matrix (6x6):
 ---- Any Motion ----
 Number of Motion Events      : 10
 
-True Positive Events             : 7
-True Positive Rate               : 70.00 %
+True Positive Events             : 9
+True Positive Rate               : 90.00 %
 
-Mean W Margin                   : 3.500066
-W Margin STDDEV                 : 11.068179 %
+Trigger Counts:
+  Fz Count                         : 0
+  Tip Count                        : 9
+  Fric Count                       : 0
+
+Mean W Margin                   : 3.656367
+W Margin STDDEV                 : 11.019744 %
 
 ---- Full Detachment ----
 Number of Detachment Events      : 5
@@ -77,11 +82,16 @@ Number of Detachment Events      : 5
 True Positive Events             : 5
 True Positive Rate               : 100.00 %
 
+Trigger Counts:
+  Fz Count                         : 0
+  Tip Count                        : 5
+  Fric Count                       : 0
+
 Mean W Margin                   : 7.000131
 W Margin STDDEV                 : 15.652769 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 467.88 Hz
-Average Loop Time                : 2.137 ms
+Average Optimisation Frequency   : 421.72 Hz
+Average Loop Time                : 2.371 ms
 
 ==================== END OF REPORT ====================

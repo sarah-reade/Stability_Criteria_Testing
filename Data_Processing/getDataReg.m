@@ -18,7 +18,6 @@ function dataReg = getDataReg(dataRegPath)
         dataReg = readtable(dataRegPath, opts);
         dataReg.Notes(ismissing(dataReg.Notes)) = "";
 
-        summary(dataReg)
     catch ME
         errordlg(sprintf('Failed to read Data_Reg.csv\n\n%s', ME.message), 'File Read Error');
         return;
