@@ -1,0 +1,82 @@
+==================== SYSTEM REPORT ====================
+
+ID: 25
+Number of Contacts: 1
+Configuration: single
+EM Configuration: off
+Surface: shelf
+Angle from Gravity: 90
+Processed Time: 31/07/2026 15:01:03
+Notes: tried to keep it in the right orientation
+
+Force Sensor Filename: 2026-07-31_10-37-12_FT47397.csv
+
+IMU Filename: 20260731_103709_IMULog.csv
+
+---------------- SCRIPT PARAMETERS -----------------
+hz    : 10.000000
+---------- IMU Thresholds:
+linThresholds    : 1.0000000000 [any motion,full detachment]
+linThresholds    : 4.0000000000 [any motion,full detachment]
+gyrThresholds    : 0.0600000000 [any motion,full detachment]
+gyrThresholds    : 0.2400000000 [any motion,full detachment]
+wrenchThreshold      : 5.0000000000
+refractoryPeriod  : 0.1000000000
+-------------- OPTIMISATION PARAMETERS ------------
+mu     : 0.900000
+r_x    : 0.077000
+r_y    : 0.077000
+r_eff  : 0.077000
+mass   : 1.569000
+
+-------------------- CONTACT DATA --------------------
+
+CONTACT 1
+-----------------------------------------------------
+f_d     : 450.000000
+s       : 0.050000
+gravity : 6.305746
+c       : 1.000000
+
+Adjoint Matrix (6x6):
+   1.000000   0.000000   0.000000   0.000000   0.000000   0.000000
+   0.000000   1.000000   0.000000   0.000000   0.000000   0.000000
+   0.000000   0.000000   1.000000   0.000000   0.000000   0.000000
+   0.000000  -0.070533   0.000000   1.000000   0.000000   0.000000
+   0.070533   0.000000   0.000000   0.000000   1.000000   0.000000
+   0.000000   0.000000   0.000000   0.000000   0.000000   1.000000
+
+--------------- POST PROCESSING RESULTS ---------------
+---- Any Motion ----
+Number of Motion Events      : 7
+
+True Positive Events             : 7
+True Positive Rate               : 100.00 %
+
+Trigger Counts:
+  Fz Count                         : 0
+  Tip Count                        : 7
+  Fric Count                       : 0
+
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
+
+---- Full Detachment ----
+Number of Detachment Events      : 7
+
+True Positive Events             : 7
+True Positive Rate               : 100.00 %
+
+Trigger Counts:
+  Fz Count                         : 0
+  Tip Count                        : 7
+  Fric Count                       : 0
+
+Mean W Margin                   : 0.000000
+W Margin STDDEV                 : 0.000000 %
+
+---- Loop Data ----
+Average Optimisation Frequency   : 738.77 Hz
+Average Loop Time                : 1.354 ms
+
+==================== END OF REPORT ====================

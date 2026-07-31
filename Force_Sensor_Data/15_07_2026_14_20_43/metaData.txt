@@ -6,7 +6,7 @@ Configuration: single
 EM Configuration: off
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 30/07/2026 16:54:41
+Processed Time: 31/07/2026 15:00:17
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-20-43_FT47397.csv
@@ -26,14 +26,14 @@ refractoryPeriod  : 0.1000000000
 mu     : 0.900000
 r_x    : 0.077000
 r_y    : 0.077000
-r_eff  : 0.038500
-mass   : 1.617000
+r_eff  : 0.077000
+mass   : 1.569000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 350.000000
+f_d     : 450.000000
 s       : 0.050000
 gravity : 6.305746
 c       : 1.000000
@@ -58,8 +58,8 @@ Trigger Counts:
   Tip Count                        : 5
   Fric Count                       : 8
 
-Mean W Margin                   : 6.808760
-W Margin STDDEV                 : 18.951413 %
+Mean W Margin                   : 6.671782
+W Margin STDDEV                 : 18.963505 %
 
 ---- Full Detachment ----
 Number of Detachment Events      : 13
@@ -72,11 +72,11 @@ Trigger Counts:
   Tip Count                        : 5
   Fric Count                       : 8
 
-Mean W Margin                   : 6.808760
-W Margin STDDEV                 : 18.951413 %
+Mean W Margin                   : 6.671782
+W Margin STDDEV                 : 18.963505 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 702.08 Hz
-Average Loop Time                : 1.424 ms
+Average Optimisation Frequency   : 727.14 Hz
+Average Loop Time                : 1.375 ms
 
 ==================== END OF REPORT ====================

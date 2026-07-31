@@ -12,6 +12,7 @@ dataReg = getDataReg(dataRegPath);
  overwrite = processDataParams.overwrite;
  clearPlots = processDataParams.clearPlots;
  detachSeverity = processDataParams.detachSeverity;
+ calculationMethod = processDataParams.calculationMethod;
 
 if isempty(selectedIdxs)
     return;
@@ -101,7 +102,7 @@ for selectionIdx = 1:numel(selectedIdxs)
 
         for sampleIdx = 1:height(wrench)
             tStart = tic;
-            [variables(sampleIdx,:),gamma_cnstr(sampleIdx),beta(sampleIdx),all_beta(sampleIdx,:,:)] = obtainAdhesionCriteria(parameters,wrench(sampleIdx,:)');
+            [variables(sampleIdx,:),gamma_cnstr(sampleIdx),beta(sampleIdx),all_beta(sampleIdx,:,:)] = obtainAdhesionCriteria(parameters,wrench(sampleIdx,:)',calculationMethod);
             loop_time(sampleIdx) = toc(tStart);
         end
         

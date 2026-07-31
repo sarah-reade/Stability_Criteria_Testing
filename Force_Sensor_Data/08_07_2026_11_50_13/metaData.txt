@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: off-off
 Surface: floor
 Angle from Gravity: 0
-Processed Time: 30/07/2026 16:50:58
+Processed Time: 31/07/2026 18:41:58
 Notes: 
 
 Force Sensor Filename: 2026-07-08_11-50-13_FT47397.csv
@@ -26,14 +26,14 @@ refractoryPeriod  : 0.1000000000
 mu     : 0.900000
 r_x    : 0.077000
 r_y    : 0.077000
-r_eff  : 0.038500
-mass   : 1.998000
+r_eff  : 0.077000
+mass   : 3.245000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 350.000000
+f_d     : 450.000000
 s       : 0.000000
 gravity : 0.000000
 c       : 1.000000
@@ -48,7 +48,7 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 350.000000
+f_d     : 450.000000
 s       : 0.000000
 gravity : 0.000000
 c       : 1.000000
@@ -69,12 +69,12 @@ True Positive Events             : 12
 True Positive Rate               : 100.00 %
 
 Trigger Counts:
-  Fz Count                         : 0
-  Tip Count                        : 3
-  Fric Count                       : 9
+  Fz Count                         : 12
+  Tip Count                        : 0
+  Fric Count                       : 0
 
-Mean W Margin                   : 10.034388
-W Margin STDDEV                 : 18.675077 %
+Mean W Margin                   : 9.658970
+W Margin STDDEV                 : 18.013942 %
 
 ---- Full Detachment ----
 Number of Detachment Events      : 9
@@ -83,15 +83,15 @@ True Positive Events             : 9
 True Positive Rate               : 100.00 %
 
 Trigger Counts:
-  Fz Count                         : 0
-  Tip Count                        : 2
-  Fric Count                       : 7
+  Fz Count                         : 9
+  Tip Count                        : 0
+  Fric Count                       : 0
 
-Mean W Margin                   : 11.210750
-W Margin STDDEV                 : 18.520852 %
+Mean W Margin                   : 10.377659
+W Margin STDDEV                 : 17.748553 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 416.63 Hz
-Average Loop Time                : 2.400 ms
+Average Optimisation Frequency   : 2304.47 Hz
+Average Loop Time                : 0.434 ms
 
 ==================== END OF REPORT ====================

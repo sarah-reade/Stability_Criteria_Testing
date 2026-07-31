@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: on-on
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 30/07/2026 16:51:59
+Processed Time: 31/07/2026 18:42:27
 Notes: loose em cable flip
 
 Force Sensor Filename: 2026-07-14_14-54-13_FT47397.csv
@@ -26,14 +26,14 @@ refractoryPeriod  : 0.1000000000
 mu     : 0.900000
 r_x    : 0.077000
 r_y    : 0.077000
-r_eff  : 0.038500
-mass   : 1.998000
+r_eff  : 0.077000
+mass   : 3.245000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 640.000000
+f_d     : 740.000000
 s       : 0.050000
 gravity : 6.305746
 c       : 1.000000
@@ -48,7 +48,7 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 640.000000
+f_d     : 740.000000
 s       : 0.050000
 gravity : 7.514896
 c       : 1.000000
@@ -65,33 +65,33 @@ Adjoint Matrix (6x6):
 ---- Any Motion ----
 Number of Motion Events      : 16
 
-True Positive Events             : 10
-True Positive Rate               : 62.50 %
+True Positive Events             : 16
+True Positive Rate               : 100.00 %
 
 Trigger Counts:
-  Fz Count                         : 0
-  Tip Count                        : 10
+  Fz Count                         : 16
+  Tip Count                        : 0
   Fric Count                       : 0
 
-Mean W Margin                   : 38.217677
-W Margin STDDEV                 : 45.188085 %
+Mean W Margin                   : 32.501574
+W Margin STDDEV                 : 37.596993 %
 
 ---- Full Detachment ----
-Number of Detachment Events      : 6
+Number of Detachment Events      : 5
 
-True Positive Events             : 2
-True Positive Rate               : 33.33 %
+True Positive Events             : 5
+True Positive Rate               : 100.00 %
 
 Trigger Counts:
-  Fz Count                         : 0
-  Tip Count                        : 2
+  Fz Count                         : 5
+  Tip Count                        : 0
   Fric Count                       : 0
 
-Mean W Margin                   : 57.742282
-W Margin STDDEV                 : 66.788972 %
+Mean W Margin                   : 46.412307
+W Margin STDDEV                 : 60.701370 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 426.30 Hz
-Average Loop Time                : 2.346 ms
+Average Optimisation Frequency   : 2138.06 Hz
+Average Loop Time                : 0.468 ms
 
 ==================== END OF REPORT ====================

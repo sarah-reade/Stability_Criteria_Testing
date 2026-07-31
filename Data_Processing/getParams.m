@@ -44,9 +44,10 @@ function parameters = getParams(config,angle,emconfig,surface)
     r = 0.077;
     parameters.r_x = r;
     parameters.r_y = r;
-    parameters.reff = r/2;%*10;
+    parameters.reff = r;%*10;
+    parameters.r = r;
 
-    m_em = 0.4;
+    m_em = 1.0;
     m_pm = 0.002*19;
     m_force = 0.09;
     m_EM_plate = 0.275;
@@ -58,12 +59,12 @@ function parameters = getParams(config,angle,emconfig,surface)
     Gg = zeros(6,6);
 
     c = 1.0;
-    p_magnet = 350;
+    p_magnet = 450;
     em_magnet = 290;
 
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
-        mag_s = 0.9;
+        mag_s = 0.15;
     elseif ismember(surface, {'shelf'})
         mag_s = 0.05;
     end
@@ -83,7 +84,7 @@ function parameters = getParams(config,angle,emconfig,surface)
 
         % Calculate Adhesion Force
         mask = double(emconfig == "on");
-        parameters.Fd = p_magnet + mask * 1400;
+        parameters.Fd = p_magnet + mask * em_magnet;
         
         % Set surface magnetic permeability
         if ~strcmp(angle,'0')
@@ -94,12 +95,15 @@ function parameters = getParams(config,angle,emconfig,surface)
 
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(1,1);
+        parameters.trans = cell(1,1);
         trans = [0 0 70.533]*0.001;
         rot = eye(3);
         parameters.G{1} = getGMatrix(trans,rot);
+        parameters.trans{1} = trans;
 
         % Calculate mass
-        parameters.m = m_EM_Interface_Single + m_EM_plate + m_force + m_pm + m_em;
+        parameters.m = m_EM_Interface_Long + m_EM_plate + m_force + m_pm + m_em;
+        parameters.m = parameters.m;
 
         % CoM to Sensor Wrench Transormation Matrix
         trans = [0.0 0.0 47.0220]*0.001;
@@ -117,6 +121,7 @@ function parameters = getParams(config,angle,emconfig,surface)
 
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(2,1);
+        parameters.trans = cell(2,1);
 
         trans = [77.1820; -63.8840; 69.0410]*0.001;
         rot = [0.6428  -0.7660  0.0000;
@@ -124,6 +129,7 @@ function parameters = getParams(config,angle,emconfig,surface)
             0.0000   0.0000  1.0000];
 
         parameters.G{1} = getGMatrix(trans, rot);
+        parameters.trans{1} = trans;
 
         trans = [-271.0299; 220.6576; 68.5300]*0.001;
         rot = [0.6428  -0.7660  0.0000;
@@ -131,9 +137,10 @@ function parameters = getParams(config,angle,emconfig,surface)
             0.0000   0.0000  1.0000];
 
         parameters.G{2} = getGMatrix(trans, rot);
+        parameters.trans{2} = trans;
 
         % Calculate mass
-        parameters.m = m_EM_Interface_Long*2 + m_Flat_Plate + m_EM_plate + m_force + m_pm + m_em;
+        parameters.m = m_EM_Interface_Long*2 + m_Flat_Plate + m_EM_plate*2 + m_force + m_pm*2 + m_em*2;
 
         % CoM to Sensor Wrench Transormation Matrix
         trans = [-97.8237 82.0855 68.5300]*0.001;
@@ -150,6 +157,7 @@ function parameters = getParams(config,angle,emconfig,surface)
         
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(2,1);
+        parameters.trans = cell(2,1);
 
         trans = [77.1820; -63.8840; 69.0410]*0.001;
         rot = [0.6428  -0.7660  0.0000;
@@ -157,6 +165,7 @@ function parameters = getParams(config,angle,emconfig,surface)
             0.0000   0.0000  1.0000];
 
         parameters.G{1} = getGMatrix(trans, rot);
+        parameters.trans{1} = trans;
 
         trans = [-165.2400; 138.6500; -246.4600]*0.001;
         rot = [0.6428  0.0000  -0.7660;
@@ -164,9 +173,10 @@ function parameters = getParams(config,angle,emconfig,surface)
             0.0000  -1.0000  0.0000];
 
         parameters.G{2} = getGMatrix(trans, rot);
+        parameters.trans{2} = trans;
 
         % Calculate mass
-        parameters.m = m_EM_Interface_Long*2 + m_RA_Plate + m_EM_plate + m_force + m_pm + m_em;
+        parameters.m = m_EM_Interface_Long*2 + m_RA_Plate + m_EM_plate*2 + m_force + m_pm*2 + m_em*2;
 
         % CoM to Sensor Wrench Transormation Matrix
         trans = [-44.0290 37.3830 -88.7095]*0.001;
@@ -199,7 +209,6 @@ function parameters = getParams(config,angle,emconfig,surface)
     parameters.gravity = Gg*g.';
 
     %print_parameters(parameters);
-    parameters.m = parameters.m*1.5;
     % plotConfigTFs(parameters);
     % drawnow;
     % keyboard;

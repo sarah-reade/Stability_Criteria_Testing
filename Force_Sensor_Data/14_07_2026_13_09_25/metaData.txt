@@ -6,7 +6,7 @@ Configuration: flat
 EM Configuration: on-on
 Surface: shelf
 Angle from Gravity: 180
-Processed Time: 30/07/2026 16:51:39
+Processed Time: 31/07/2026 14:57:44
 Notes: 
 
 Force Sensor Filename: 2026-07-14_13-09-25_FT47397.csv
@@ -26,14 +26,14 @@ refractoryPeriod  : 0.1000000000
 mu     : 0.900000
 r_x    : 0.077000
 r_y    : 0.077000
-r_eff  : 0.038500
-mass   : 1.998000
+r_eff  : 0.077000
+mass   : 3.245000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 640.000000
+f_d     : 740.000000
 s       : 0.050000
 gravity : 0.000000
 c       : 1.000000
@@ -48,7 +48,7 @@ Adjoint Matrix (6x6):
 
 CONTACT 2
 -----------------------------------------------------
-f_d     : 640.000000
+f_d     : 740.000000
 s       : 0.050000
 gravity : 0.000000
 c       : 1.000000
@@ -73,8 +73,8 @@ Trigger Counts:
   Tip Count                        : 10
   Fric Count                       : 0
 
-Mean W Margin                   : 12.564969
-W Margin STDDEV                 : 32.039591 %
+Mean W Margin                   : 10.550640
+W Margin STDDEV                 : 27.060024 %
 
 ---- Full Detachment ----
 Number of Detachment Events      : 6
@@ -87,11 +87,11 @@ Trigger Counts:
   Tip Count                        : 6
   Fric Count                       : 0
 
-Mean W Margin                   : 21.959361
-W Margin STDDEV                 : 40.695060 %
+Mean W Margin                   : 18.340749
+W Margin STDDEV                 : 34.346098 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 389.69 Hz
-Average Loop Time                : 2.566 ms
+Average Optimisation Frequency   : 396.72 Hz
+Average Loop Time                : 2.521 ms
 
 ==================== END OF REPORT ====================

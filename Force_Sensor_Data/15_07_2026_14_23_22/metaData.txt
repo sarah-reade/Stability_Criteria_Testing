@@ -6,7 +6,7 @@ Configuration: single
 EM Configuration: on
 Surface: shelf
 Angle from Gravity: 90
-Processed Time: 30/07/2026 16:54:53
+Processed Time: 31/07/2026 15:00:27
 Notes: many orientations were used for this one also safety rope was the pulling rope
 
 Force Sensor Filename: 2026-07-15_14-23-22_FT47397.csv
@@ -26,14 +26,14 @@ refractoryPeriod  : 0.1000000000
 mu     : 0.900000
 r_x    : 0.077000
 r_y    : 0.077000
-r_eff  : 0.038500
-mass   : 1.617000
+r_eff  : 0.077000
+mass   : 1.569000
 
 -------------------- CONTACT DATA --------------------
 
 CONTACT 1
 -----------------------------------------------------
-f_d     : 1750.000000
+f_d     : 740.000000
 s       : 0.050000
 gravity : 6.305746
 c       : 1.000000
@@ -50,33 +50,33 @@ Adjoint Matrix (6x6):
 ---- Any Motion ----
 Number of Motion Events      : 17
 
-True Positive Events             : 2
-True Positive Rate               : 11.76 %
+True Positive Events             : 15
+True Positive Rate               : 88.24 %
 
 Trigger Counts:
   Fz Count                         : 0
-  Tip Count                        : 0
-  Fric Count                       : 2
+  Tip Count                        : 7
+  Fric Count                       : 8
 
-Mean W Margin                   : 11.373004
-W Margin STDDEV                 : 20.789796 %
+Mean W Margin                   : 14.591246
+W Margin STDDEV                 : 18.764457 %
 
 ---- Full Detachment ----
 Number of Detachment Events      : 16
 
-True Positive Events             : 2
-True Positive Rate               : 12.50 %
+True Positive Events             : 14
+True Positive Rate               : 87.50 %
 
 Trigger Counts:
   Fz Count                         : 0
-  Tip Count                        : 0
-  Fric Count                       : 2
+  Tip Count                        : 7
+  Fric Count                       : 7
 
-Mean W Margin                   : 10.302203
-W Margin STDDEV                 : 20.981851 %
+Mean W Margin                   : 14.199876
+W Margin STDDEV                 : 19.308055 %
 
 ---- Loop Data ----
-Average Optimisation Frequency   : 701.38 Hz
-Average Loop Time                : 1.426 ms
+Average Optimisation Frequency   : 718.86 Hz
+Average Loop Time                : 1.391 ms
 
 ==================== END OF REPORT ====================

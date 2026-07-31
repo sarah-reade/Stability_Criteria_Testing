@@ -7,11 +7,12 @@ function [processDataParams,selectedIdxs] = runSelectionUi(dataReg)
 
     displayItems = buildDisplayItems(dataReg);
     infoItems = buildInfoItems(dataReg);
-    [overwrite,plots,detachSeverity,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+    [overwrite,plots,detachSeverity,calculationMethod,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
     
     processDataParams.overwrite = overwrite;
     processDataParams.clearPlots = plots;
     processDataParams.detachSeverity = detachSeverity;
+    processDataParams.calculationMethod = calculationMethod;
 
 end
 
@@ -60,13 +61,14 @@ end
 
 end
 
-function [overwrite,plots,detachSeverity,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,plots,detachSeverity,calculationMethod,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
 overwrite = true;
 plots = false;
 detachSeverity = "Motion";
+calculationMethod = "SOCP";
 rowCount = height(dataReg);
 selectedMask = false(rowCount, 1);
 selectionConfirmed = false;
@@ -146,7 +148,7 @@ surfaceDropDown = uidropdown(filterGrid, ...
 filterGrid = uigridlayout(mainGridLayout, [1 6]);
 filterGrid.Layout.Row = 3;
 
-filterGrid.ColumnWidth = {150, '1x',150, 40, 80,40};
+filterGrid.ColumnWidth = {150, '1x',150, '1x',150, 40, 80,40};
 filterGrid.RowHeight = {24};
 
 uilabel(filterGrid, 'Text', 'Detachment Severity', ...
@@ -154,6 +156,12 @@ uilabel(filterGrid, 'Text', 'Detachment Severity', ...
 detachmentDropDown = uidropdown(filterGrid, ...
     'Items', {'Any Motion', 'Full Detachment'}, ...
     'Value', 'Any Motion');
+
+uilabel(filterGrid, 'Text', 'Calculation Method', ...
+    'HorizontalAlignment', 'right');
+calculationDropDown = uidropdown(filterGrid, ...
+    'Items', {'SOCP', 'QP', 'ZML','SOCP-ZML','QP-ZML'}, ...
+    'Value', 'SOCP');
 
 uilabel(filterGrid, ...
     'Text', sprintf('Overwrite Existing Files'), ...
@@ -225,6 +233,10 @@ if isvalid(selectionFig)
     elseif strcmp(detachSeverity, 'Full Detachment')
         detachSeverity = 'Detachment';
     end
+
+
+    calculationMethod = calculationDropDown.Value;
+    calculationMethod = erase(calculationMethod,"-");
     
     delete(selectionFig);
 end

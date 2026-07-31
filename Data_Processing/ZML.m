@@ -1,0 +1,478 @@
+function gamma = ZML(parameters,wrench)
+    visualise = false;
+    persistent cachedParameters cachedSupportPolyhedron
+
+    % Recompute only if parameters have changed
+    if isempty(cachedParameters) || ~isequal(parameters, cachedParameters)
+        cachedSupportPolyhedron = get_support_polyhedron(parameters,visualise);
+        cachedParameters = parameters;
+    end
+
+    % Get support polyhedron relative to force sensor
+    support_polyhedron = cachedSupportPolyhedron;
+
+    % Calculate the zero moment line
+    zml = calculate_ZML(wrench,visualise);
+
+    % Calculate the minimum distance between the edge of the polyhedron and the zml
+    [gamma,~] = distance_ZML_to_polyhedron(...
+        support_polyhedron,...
+        zml,visualise);
+    
+    if visualise
+        keyboard
+    end
+end
+
+function zml = calculate_ZML(wrench,visualise)
+
+    % Calculate zero moment line relative to wrench reference point
+    %
+    % Input:
+    %   wrench = [Fx Fy Fz Tx Ty Tz]'
+    %
+    % Output:
+    %   zml.origin    - closest point on ZML to reference point
+    %   zml.direction - ZML direction
+    %   zml.point()   - function returning points on the line
+
+    if nargin < 2
+        visualise = false;
+    end
+
+    F = wrench(1:3);
+    tau = wrench(4:6);
+
+
+    if norm(F) < eps
+        error('ZML undefined: resultant force is zero');
+    end
+
+
+    % Point on ZML closest to wrench reference point
+    p0 = cross(F,tau)/(dot(F,F));
+
+
+    % Line direction
+    direction = F/norm(F);
+
+
+    zml.origin = p0;
+    zml.direction = direction;
+
+
+    % Parametric line
+    zml.point = @(lambda) p0 + lambda*direction;
+
+    if visualise
+        visualize_ZML(zml);
+    end
+
+end
+
+function visualize_ZML(zml, varargin)
+
+    % visualize_ZML
+    %
+    % Plot the Zero Moment Line on the current figure.
+    %
+    % Input:
+    %   zml.origin    - point on ZML closest to wrench reference point
+    %   zml.direction - unit direction vector of ZML
+    %
+    % Optional:
+    %   lineLength - total length of line to display (m)
+
+    if nargin < 2
+        lineLength = 1.0;
+    else
+        lineLength = varargin{1};
+    end
+
+
+    % Extract ZML parameters
+    p0 = zml.origin(:);
+    d  = zml.direction(:);
+
+
+    % Generate points along the line
+    s = linspace(-lineLength/2, lineLength/2, 100);
+
+    points = p0 + d*s;
+
+
+    % Plot ZML
+    plot3(...
+        points(1,:),...
+        points(2,:),...
+        points(3,:),...
+        'r-',...
+        'LineWidth',3,...
+        'DisplayName','Zero Moment Line');
+
+
+    % Plot closest point to reference origin
+    scatter3(...
+        p0(1),...
+        p0(2),...
+        p0(3),...
+        100,...
+        'r',...
+        'filled',...
+        'DisplayName','ZML reference point');
+
+
+    % Plot direction arrow
+    quiver3(...
+        p0(1),...
+        p0(2),...
+        p0(3),...
+        d(1)*0.1,...
+        d(2)*0.1,...
+        d(3)*0.1,...
+        0,...
+        'r',...
+        'LineWidth',2,...
+        'DisplayName','ZML direction');
+
+end
+
+function [distance, closestPoints] = distance_ZML_to_polyhedron(poly, zml, visualise)
+
+    % distance_ZML_to_polyhedron
+    %
+    % If ZML intersects the polyhedron:
+    %   distance = positive penetration depth along ZML
+    %
+    % If ZML is outside:
+    %   distance = negative shortest distance to polyhedron edges
+    %
+    % Outputs:
+    %   distance
+    %       >0 : ZML penetration depth
+    %       <0 : distance outside polyhedron
+    %
+    %   closestPoints
+    %       [point_on_ZML; point_on_surface]
+    if nargin < 3
+        visualise = false;
+    end
+
+    V = poly.vertices;
+    F = poly.faces;
+
+
+    p = zml.origin(:);
+    d = zml.direction(:);
+    d = d/norm(d);
+
+
+    % --------------------------------------------------
+    % Check intersections with faces
+    % --------------------------------------------------
+
+    intersectionPoints = [];
+
+
+    for i = 1:size(F,1)
+
+        tri = V(F(i,:),:);
+
+        [hit,~,x] = lineTriangleIntersection(p,d,tri);
+
+        if hit
+            intersectionPoints(end+1,:) = x';
+        end
+
+    end
+
+
+    % Remove duplicate intersections from shared edges
+
+    if ~isempty(intersectionPoints)
+
+        intersectionPoints = unique( ...
+            round(intersectionPoints,10), ...
+            'rows');
+
+    end
+
+
+    % --------------------------------------------------
+    % ZML passes through polyhedron
+    % --------------------------------------------------
+
+    if size(intersectionPoints,1) >= 2
+
+
+        % Project intersections onto ZML axis
+
+        t = (intersectionPoints-p')*d;
+
+
+        [tmin,idx1] = min(t);
+        [tmax,idx2] = max(t);
+
+
+        % Positive penetration depth
+
+        distance = tmax-tmin;
+
+
+        closestPoints = [
+            intersectionPoints(idx1,:);
+            intersectionPoints(idx2,:)
+        ];
+
+
+    else
+
+
+        % --------------------------------------------------
+        % Outside case: distance to edges
+        % --------------------------------------------------
+
+        edges = [
+            F(:,[1 2]);
+            F(:,[2 3]);
+            F(:,[3 1])
+        ];
+
+
+        edges = sort(edges,2);
+        edges = unique(edges,'rows');
+
+
+        distance = inf;
+        closestPoints = [];
+
+
+        for i = 1:size(edges,1)
+
+            a = V(edges(i,1),:)';
+            b = V(edges(i,2),:)';
+
+
+            [dist,pLine,pEdge] = distanceLineSegment( ...
+                p,d,a,b);
+
+
+            if dist < distance
+
+                distance = dist;
+
+                closestPoints = [
+                    pLine';
+                    pEdge'
+                ];
+
+            end
+
+        end
+
+
+        % Negative sign indicates outside
+
+        distance = -distance;
+
+    end
+
+    if visualise
+        visualize_ZML_distance(closestPoints, abs(distance))
+    end
+
+end
+
+function [hit,t,x] = lineTriangleIntersection(p,d,tri)
+
+    % Line-triangle intersection using Moller-Trumbore algorithm
+
+    v0 = tri(1,:)';
+    v1 = tri(2,:)';
+    v2 = tri(3,:)';
+
+
+    % Default outputs
+    hit = false;
+    t = NaN;
+    x = [NaN; NaN; NaN];
+
+
+    e1 = v1-v0;
+    e2 = v2-v0;
+
+
+    h = cross(d,e2);
+    a = dot(e1,h);
+
+
+    % Parallel to triangle
+    if abs(a) < 1e-10
+        return
+    end
+
+
+    f = 1/a;
+
+    s = p-v0;
+
+    u = f*dot(s,h);
+
+
+    % Outside triangle
+    if u < 0 || u > 1
+        return
+    end
+
+
+    q = cross(s,e1);
+
+    v = f*dot(d,q);
+
+
+    % Outside triangle
+    if v < 0 || (u+v) > 1
+        return
+    end
+
+
+    % Intersection distance along line
+    t = f*dot(e2,q);
+
+
+    % Behind line origin (if you want a ray instead of a line)
+    % if t < 0
+    %     t = NaN;
+    %     return
+    % end
+
+
+    x = p + t*d;
+
+    hit = true;
+
+end
+
+function [distance, pointLine, pointSegment] = ...
+    distanceLineSegment(p,d,a,b)
+
+    % Infinite line:
+    %
+    % x = p + s*d
+    %
+    % Segment:
+    %
+    % y = a + t(b-a)
+
+
+    u = d;
+    v = b-a;
+
+    w0 = p-a;
+
+
+    A = dot(u,u);
+    B = dot(u,v);
+    C = dot(v,v);
+    D = dot(u,w0);
+    E = dot(v,w0);
+
+
+    denom = A*C-B^2;
+
+
+    if abs(denom)<1e-12
+
+        % Parallel case
+
+        s = 0;
+        t = dot(w0,v)/C;
+
+    else
+
+        s = (B*E-C*D)/denom;
+        t = (A*E-B*D)/denom;
+
+    end
+
+
+    % Clamp segment parameter
+
+    t = max(0,min(1,t));
+
+
+    % Recalculate line point
+
+    pointSegment = a+t*v;
+
+    s = dot(pointSegment-p,u);
+
+    pointLine = p+s*u;
+
+
+    distance = norm(pointLine-pointSegment);
+
+end
+
+function visualize_ZML_distance(closestPoints, dmin)
+
+    % visualize_ZML_distance
+    %
+    % Plots the closest points between the ZML and support polyhedron edge.
+    %
+    % Inputs:
+    %   closestPoints - 2x3 matrix:
+    %                   row 1 = closest point on ZML
+    %                   row 2 = closest point on polyhedron edge
+    %
+    %   dmin          - minimum distance
+
+
+    pZML  = closestPoints(1,:);
+    pEdge = closestPoints(2,:);
+
+
+    hold on;
+
+
+    % Closest point on ZML
+    scatter3(...
+        pZML(1),...
+        pZML(2),...
+        pZML(3),...
+        120,...
+        'filled',...
+        'DisplayName','Closest point on ZML');
+
+
+    % Closest point on support boundary
+    scatter3(...
+        pEdge(1),...
+        pEdge(2),...
+        pEdge(3),...
+        120,...
+        'filled',...
+        'DisplayName','Closest point on boundary');
+
+
+    % Connecting distance line
+    plot3(...
+        [pZML(1) pEdge(1)],...
+        [pZML(2) pEdge(2)],...
+        [pZML(3) pEdge(3)],...
+        'LineWidth',3,...
+        'DisplayName',sprintf('ZML distance = %.4f m',dmin));
+
+
+    % Label distance midpoint
+    mid = (pZML+pEdge)/2;
+
+    text(...
+        mid(1),...
+        mid(2),...
+        mid(3),...
+        sprintf(' %.3f m',dmin),...
+        'FontSize',12);
+
+
+end

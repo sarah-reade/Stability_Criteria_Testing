@@ -11,8 +11,8 @@ ID,Force Sensor Filename,IMU Filename,Configuration,Angle from Gravity,EM Config
 11,2026-07-14_15-08-32_FT47397,20260714_150834_IMULog,flat,90V,on-on,shelf,loose mount and em cable
 12,2026-07-14_15-22-28_FT47397,20260714_152226_IMULog,flat,0,off-off,floor,
 13,2026-07-14_16-45-03_FT47397,20260714_164502_IMULog,flat,90,on-on,shelf,
-14,2026-07-15_10-39-14_FT47397,20260715_103909_IMULog,RA,0,off-off,shelf,bending mount
-15,2026-07-15_10-44-33_FT47397,20260715_104432_IMULog,RA,0,on-on,shelf,mount bending didn't slide at all
+14,2026-07-15_10-39-14_FT47397,20260715_103909_IMULog,RA,0,off-off,floor,bending mount
+15,2026-07-15_10-44-33_FT47397,20260715_104432_IMULog,RA,0,on-on,floor,mount bending didn't slide at all
 16,2026-07-15_10-53-05_FT47397,20260715_105303_IMULog,RA,180,off-off,shelf,
 17,2026-07-15_11-04-49_FT47397,20260715_110447_IMULog,RA,180,on-on,shelf,
 18,2026-07-15_11-25-22_FT47397,20260715_112520_IMULog,RA,90,off-off,steelbeam,
@@ -22,3 +22,9 @@ ID,Force Sensor Filename,IMU Filename,Configuration,Angle from Gravity,EM Config
 22,2026-07-15_14-26-30_FT47397,20260715_142626_IMULog,single,0,off,floor,
 23,2026-07-15_14-29-47_FT47397,20260715_142941_IMULog,single,180,off,shelf,
 24,2026-07-15_14-32-55_FT47397,20260715_143254_IMULog,single,180,on,shelf,
+25,2026-07-31_10-37-12_FT47397,20260731_103709_IMULog,single,90,off,shelf,tried to keep it in the right orientation
+26,2026-07-31_10-47-47_FT47397,20260731_104742_IMULog,single,90,off,shelf,long run
+27,2026-07-31_11-03-46_FT47397,20260731_110344_IMULog,single,90,on,shelf,long run
+28,2026-07-31_11-25-48_FT47397,20260731_112545_IMULog,single,0,off,floor,long run
+29,2026-07-31_11-47-56_FT47397,20260731_114754_IMULog,single,180,off,shelf,long run
+30,2026-07-31_11-57-22_FT47397,20260731_115720_IMULog,single,180,on,shelf,long run
