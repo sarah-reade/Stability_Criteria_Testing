@@ -61,7 +61,6 @@ function [x,beta] = solveSOCP(parameters, wrench)
     % -----------------------------
     % Linear inequality
     % -----------------------------
-
     nrow = nc;
     ncol = 6 * nc + 1;
     

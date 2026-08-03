@@ -65,6 +65,7 @@ function parameters = getParams(config,angle,emconfig,surface)
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
         mag_s = 0.15;
+        parameters.r_x = parameters.r_x/2;
     elseif ismember(surface, {'shelf'})
         mag_s = 0.05;
     end
@@ -96,7 +97,7 @@ function parameters = getParams(config,angle,emconfig,surface)
         % Calculate G_i Wrench Transormation Matrix
         parameters.G = cell(1,1);
         parameters.trans = cell(1,1);
-        trans = [0 0 70.533]*0.001;
+        trans = [0; 0; 70.533]*0.001;
         rot = eye(3);
         parameters.G{1} = getGMatrix(trans,rot);
         parameters.trans{1} = trans;
@@ -106,7 +107,7 @@ function parameters = getParams(config,angle,emconfig,surface)
         parameters.m = parameters.m;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [0.0 0.0 47.0220]*0.001;
+        trans = [0.0; 0.0; 47.0220]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
         
@@ -143,7 +144,7 @@ function parameters = getParams(config,angle,emconfig,surface)
         parameters.m = m_EM_Interface_Long*2 + m_Flat_Plate + m_EM_plate*2 + m_force + m_pm*2 + m_em*2;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [-97.8237 82.0855 68.5300]*0.001;
+        trans = [-97.8237; 82.0855; 68.5300]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
 
@@ -179,7 +180,7 @@ function parameters = getParams(config,angle,emconfig,surface)
         parameters.m = m_EM_Interface_Long*2 + m_RA_Plate + m_EM_plate*2 + m_force + m_pm*2 + m_em*2;
 
         % CoM to Sensor Wrench Transormation Matrix
-        trans = [-44.0290 37.3830 -88.7095]*0.001;
+        trans = [-44.0290; 37.3830; -88.7095]*0.001;
         rot = eye(3);
         Gg = getGMatrix(trans,rot);
 

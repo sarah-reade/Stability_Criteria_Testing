@@ -17,11 +17,12 @@ function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(paramete
     switch method
         case 'SOCP'
             [variables,gamma_cnstr,beta,all_beta] = SOCP(parameters,wrench);
-        case 'ZMP'
+        case 'ZML'
             gamma_cnstr = ZML(parameters,wrench);
             beta = gamma_cnstr;
         case 'QP'
-
+            [variables,gamma_cnstr] = QP(parameters,wrench);
+            beta = gamma_cnstr;
         case 'SOCPZML'
             [variables,gamma_cnstr,beta,all_beta] = SOCPZML(parameters,wrench);
         case 'QPZML'

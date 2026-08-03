@@ -7,10 +7,11 @@ function [processDataParams,selectedIdxs] = runSelectionUi(dataReg)
 
     displayItems = buildDisplayItems(dataReg);
     infoItems = buildInfoItems(dataReg);
-    [overwrite,plots,detachSeverity,calculationMethod,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+    [overwrite,plots,detachSeverity,calculationMethod,adhoc,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
     
     processDataParams.overwrite = overwrite;
     processDataParams.clearPlots = plots;
+    processDataParams.adhoc = adhoc;
     processDataParams.detachSeverity = detachSeverity;
     processDataParams.calculationMethod = calculationMethod;
 
@@ -61,22 +62,27 @@ end
 
 end
 
-function [overwrite,plots,detachSeverity,calculationMethod,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,plots,detachSeverity,calculationMethod,adhoc,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
-overwrite = true;
-plots = false;
-detachSeverity = "Motion";
-calculationMethod = "SOCP";
+settings = loadSelectionSettings();
+
+overwrite = settings.overwrite;
+plots = settings.plots;
+adhoc = settings.adhoc;
+detachSeverity = settings.detachSeverity;
+calculationMethod = settings.calculationMethod;
+
 rowCount = height(dataReg);
 selectedMask = false(rowCount, 1);
 selectionConfirmed = false;
 
 filterState = struct( ...
-    'Configuration', "All", ...
-    'Angle', "All", ...
-    'EMConfig', "All");
+    'Configuration', settings.Configuration, ...
+    'Angle', settings.Angle, ...
+    'EMConfig', settings.EMConfig, ...
+    'Surface', settings.Surface);
 
 isUpdatingFilters = false;
 
@@ -120,62 +126,69 @@ uilabel(filterGrid, 'Text', 'Configuration', ...
     'HorizontalAlignment', 'right');
 configurationDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'flat', 'RA', 'single'}, ...
-    'Value', 'All', ...
+    'Value', settings.Configuration, ...
     'ValueChangedFcn', @onFilterChange);
 
 uilabel(filterGrid, 'Text', 'AngleFromGravity', ...
     'HorizontalAlignment', 'right');
 angleDropDown = uidropdown(filterGrid, ...
     'Items', {'All', '0', '90', '180', '90V'}, ...
-    'Value', 'All', ...
+    'Value', settings.Angle, ...
     'ValueChangedFcn', @onFilterChange);
 
 uilabel(filterGrid, 'Text', 'EM Config', ...
     'HorizontalAlignment', 'right');
 emDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'off', 'on', 'off-off', 'on-on', 'off-on', 'on-off'}, ...
-    'Value', 'All', ...
+    'Value', settings.EMConfig, ...
     'ValueChangedFcn', @onFilterChange);
 
 uilabel(filterGrid, 'Text', 'Surface', ...
     'HorizontalAlignment', 'right');
 surfaceDropDown = uidropdown(filterGrid, ...
     'Items', {'All', 'shelf', 'floor', 'steelbeam'}, ...
-    'Value', 'All', ...
+    'Value', settings.Surface, ...
     'ValueChangedFcn', @onFilterChange);
 
 
 filterGrid = uigridlayout(mainGridLayout, [1 6]);
 filterGrid.Layout.Row = 3;
 
-filterGrid.ColumnWidth = {150, '1x',150, '1x',150, 40, 80,40};
+filterGrid.ColumnWidth = {120, '1x',120, '1x',150, 40,80, 40, 120,40};
 filterGrid.RowHeight = {24};
 
 uilabel(filterGrid, 'Text', 'Detachment Severity', ...
     'HorizontalAlignment', 'right');
 detachmentDropDown = uidropdown(filterGrid, ...
     'Items', {'Any Motion', 'Full Detachment'}, ...
-    'Value', 'Any Motion');
+    'Value', settings.detachSeverity);
 
 uilabel(filterGrid, 'Text', 'Calculation Method', ...
     'HorizontalAlignment', 'right');
 calculationDropDown = uidropdown(filterGrid, ...
     'Items', {'SOCP', 'QP', 'ZML','SOCP-ZML','QP-ZML'}, ...
-    'Value', 'SOCP');
+    'Value', settings.calculationMethod');
 
 uilabel(filterGrid, ...
     'Text', sprintf('Overwrite Existing Files'), ...
     'HorizontalAlignment', 'right');
 overwriteCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
-    'Value', true);
+    'Value', settings.overwrite);
 
 uilabel(filterGrid, ...
     'Text', sprintf('Keep Plots?'), ...
     'HorizontalAlignment', 'right');
 plotsCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
-    'Value', false);
+    'Value', settings.plots);
+
+uilabel(filterGrid, ...
+    'Text', sprintf('AdHoc Processing'), ...
+    'HorizontalAlignment', 'right');
+adhocCheckbox = uicheckbox(filterGrid, ...
+    'Text', '', ...
+    'Value', settings.adhoc);
 
 tablePanel = uipanel(mainGrid, 'Title', 'Datasets');
 tablePanel.Layout.Row = 3;
@@ -226,6 +239,7 @@ if isvalid(selectionFig)
     end
     overwrite = overwriteCheckbox.Value;
     plots = plotsCheckbox.Value;
+    adhoc = adhocCheckbox.Value;
     detachSeverity = detachmentDropDown.Value;
 
     if strcmp(detachSeverity, 'Any Motion')
@@ -238,8 +252,56 @@ if isvalid(selectionFig)
     calculationMethod = calculationDropDown.Value;
     calculationMethod = erase(calculationMethod,"-");
     
+    saveSelectionSettings();
+    
     delete(selectionFig);
 end
+
+    function settings = loadSelectionSettings()
+
+        defaults = struct( ...
+            'Configuration', "All", ...
+            'Angle', "All", ...
+            'EMConfig', "All", ...
+            'Surface', "All", ...
+            'overwrite', true, ...
+            'plots', false, ...
+            'adhoc', false, ...
+            'detachSeverity', "Any Motion", ...
+            'calculationMethod', "SOCP");
+
+        settings = defaults;
+
+        if ispref('ForceSensorUI', 'settings')
+            saved = getpref('ForceSensorUI', 'settings');
+
+            fields = fieldnames(defaults);
+            for i = 1:numel(fields)
+                if isfield(saved, fields{i})
+                    settings.(fields{i}) = saved.(fields{i});
+                end
+            end
+        end
+    end
+
+
+    function saveSelectionSettings()
+
+        settings.Configuration = string(configurationDropDown.Value);
+        settings.Angle = string(angleDropDown.Value);
+        settings.EMConfig = string(emDropDown.Value);
+        settings.Surface = string(surfaceDropDown.Value);
+
+        settings.overwrite = overwriteCheckbox.Value;
+        settings.plots = plotsCheckbox.Value;
+        settings.adhoc = adhocCheckbox.Value;
+
+        settings.detachSeverity = string(detachmentDropDown.Value);
+        settings.calculationMethod = string(calculationDropDown.Value);
+
+        setpref('ForceSensorUI', 'settings', settings);
+
+    end
 
     function onFilterChange(~, ~)
         if isUpdatingFilters

@@ -4,7 +4,7 @@ function support_polyhedron = get_support_polyhedron(params, visualise)
         visualise = false;
     end
 
-    thickness = 0.1; % artificial thickness (m)
+    thickness = 0.00001; % artificial thickness (m)
 
     points = generateContactPatchPoints(params,64);
 
@@ -34,6 +34,8 @@ function support_polyhedron = get_support_polyhedron(params, visualise)
                 -1  1  1
             ]*eps + centre;
 
+            support_polyhedron.planar = true;
+
 
         case 1
             % Line -> thin cylinder-like prism
@@ -60,6 +62,8 @@ function support_polyhedron = get_support_polyhedron(params, visualise)
                 p2 + thickness*(-n1-n2)';
                 p2 + thickness*( n1-n2)'
             ];
+        
+            support_polyhedron.planar = true;
 
 
         case 2
@@ -79,30 +83,18 @@ function support_polyhedron = get_support_polyhedron(params, visualise)
                 lower
             ];
 
+            support_polyhedron.planar = true;
 
         case 3
             % Already 3D
             [~,S,V] = svd(centred,'econ');
             s = diag(S);
-
             if s(3) < 1e-3*s(1)
-
-                % Planar contact patch
-                normal = V(:,3)';
-
-                offset = 0.5*thickness*normal;
-
-                points3D = [
-                    points + offset;
-                    points - offset
-                ];
-
+                support_polyhedron.planar = true;
             else
-
-                % Genuine 3D support region
-                points3D = points;
-
+                support_polyhedron.planar = false;
             end
+            points3D = points;
 
     end
 
@@ -123,6 +115,10 @@ function support_polyhedron = get_support_polyhedron(params, visualise)
     support_polyhedron.volume = volume;
     support_polyhedron.points = points3D;
     support_polyhedron.type = rankP;
+
+    if support_polyhedron.planar
+        support_polyhedron.support_polygon = getSupportPolygon(support_polyhedron);
+    end
 
     if visualise
         visualize_support_polyhedron(params,support_polyhedron)
@@ -159,18 +155,27 @@ function contactPoints = generateContactPatchPoints(parameters,N)
             ];
 
             worldPoint = p + R*localPoint;
-
+            
             contactPoints(end+1,:) = worldPoint';
 
         end
 
     end
+    
 end
 
 
 function visualize_support_polyhedron(params, support_polyhedron)
 
-    figure;
+    fig = findall(groot, 'Type', 'figure', 'Name', 'My Figure');
+
+    if isempty(fig)
+        fig = figure('Name', 'My Figure');
+    else
+        figure(fig);    % Bring existing figure to the front
+        clf(fig);
+    end
+
     hold on;
     grid on;
     axis equal;
@@ -298,5 +303,71 @@ function visualize_support_polyhedron(params, support_polyhedron)
     legend('Support hull',...
            'Contact samples',...
            'Contact centre');
+
+end
+
+function support_polygon = getSupportPolygon(support_polyhedron)
+
+    points = support_polyhedron.points;
+
+    % Centre points
+    centre = mean(points,1);
+    centred = points - centre;
+
+
+    % SVD gives plane basis
+    [~,~,V] = svd(centred,'econ');
+
+    % Plane coordinates
+    basis = V(:,1:2);
+
+    points2D = centred * basis;
+
+
+    % Convex hull in plane coordinates
+    hullIDs = convhull(...
+        points2D(:,1),...
+        points2D(:,2));
+
+
+    % Remove repeated final point from convhull
+    hullIDs(end) = [];
+
+
+    %% Build polygon structure
+
+    support_polygon.vertices3D = points(hullIDs,:);
+
+    support_polygon.vertices2D = points2D(hullIDs,:);
+
+    support_polygon.origin = centre;
+
+    support_polygon.basis = basis;
+
+    support_polygon.normal = V(:,3);
+
+
+    % Ordered boundary
+    support_polygon.boundary = (1:length(hullIDs))';
+
+
+    % Polygon area in local coordinates
+    x = support_polygon.vertices2D(:,1);
+    y = support_polygon.vertices2D(:,2);
+
+    support_polygon.area = polyarea(x,y);
+
+
+    % Convenience fields
+    support_polygon.type = 'polygon';
+    support_polygon.planar = true;
+
+    %% Plane representation
+
+    support_polygon.plane.point = centre;
+
+    support_polygon.plane.normal = V(:,3);
+
+    support_polygon.plane.basis = basis;
 
 end

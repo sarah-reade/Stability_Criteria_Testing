@@ -1,6 +1,6 @@
 function gamma = ZML(parameters,wrench)
     visualise = false;
-    persistent cachedParameters cachedSupportPolyhedron
+    persistent cachedParameters cachedSupportPolyhedron callCount
 
     % Recompute only if parameters have changed
     if isempty(cachedParameters) || ~isequal(parameters, cachedParameters)
@@ -10,17 +10,41 @@ function gamma = ZML(parameters,wrench)
 
     % Get support polyhedron relative to force sensor
     support_polyhedron = cachedSupportPolyhedron;
-
-    % Calculate the zero moment line
-    zml = calculate_ZML(wrench,visualise);
-
-    % Calculate the minimum distance between the edge of the polyhedron and the zml
-    [gamma,~] = distance_ZML_to_polyhedron(...
-        support_polyhedron,...
-        zml,visualise);
     
+    % if 2D 
+    if support_polyhedron.planar
+        % Calculate ZMP
+        zmp = calculate_ZMP(wrench,support_polyhedron.support_polygon.plane,visualise);
+        % calculate distance from zmp to polygon
+        [gamma,~] = distance_ZMP_to_polygon(...
+            support_polyhedron,...
+            zmp,visualise);
+    % if 3D 
+    else
+        % Calculate the zero moment line
+        zml = calculate_ZML(wrench,visualise);
+    
+        % Calculate the minimum distance between the edge of the polyhedron and the zml
+        [gamma,~] = distance_ZML_to_polyhedron(...
+            support_polyhedron,...
+            zml,visualise);
+    end
+    
+
     if visualise
-        keyboard
+
+
+        if isempty(callCount)
+            callCount = 0;
+        end
+
+        callCount = callCount + 1;
+
+        visualiseEvery = 10;   % trigger every 10 calls
+
+        if mod(callCount, visualiseEvery) == 0
+            keyboard
+        end
     end
 end
 
@@ -475,4 +499,229 @@ function visualize_ZML_distance(closestPoints, dmin)
         'FontSize',12);
 
 
+end
+
+function zmp = calculate_ZMP(wrench,plane, visualise)
+
+    if nargin < 3
+        visualise = false;
+    end
+
+    F = wrench(1:3);
+    M = wrench(4:6);
+
+
+    if abs(F(3)) < 1e-9
+        error('Cannot calculate ZMP: vertical force is zero');
+    end
+
+
+    % ZMP line of action:
+    %
+    % r = [ -My/Fz
+    %        Mx/Fz
+    %        0 ] + alpha*[0 0 1]
+    %
+    % Find intersection with support plane:
+    % n.(r-plane.point)=0
+
+    zmp0 = [
+        -M(2)/F(3);
+        M(1)/F(3);
+        0
+    ];
+
+
+    line_direction = [0;0;1];
+
+
+    plane_point = plane.point(:);
+    plane_normal = plane.normal(:);
+
+
+    alpha = dot(plane_normal, plane_point - zmp0) / ...
+            dot(plane_normal, line_direction);
+
+
+    zmp.point = zmp0 + alpha*line_direction;
+
+
+    zmp.x = zmp.point(1);
+    zmp.y = zmp.point(2);
+    zmp.z = zmp.point(3);
+
+
+    if visualise
+        visualise_ZMP(zmp)
+    end
+
+end
+
+function visualise_ZMP(zmp)
+    % Assume figure already exists
+    hold on;
+
+    scatter3(...
+        zmp.point(1),...
+        zmp.point(2),...
+        zmp.point(3),...
+        100,...
+        'r',...
+        'filled',...
+        'MarkerEdgeColor','k');
+
+    text(...
+        zmp.point(1),...
+        zmp.point(2),...
+        zmp.point(3),...
+        ' ZMP');
+end
+
+function [distance,closest_points] = distance_ZMP_to_polygon(...
+            support_polyhedron,...
+            zmp,...
+            visualise)
+
+    if nargin < 3
+        visualise = false;
+    end
+
+
+    %% Extract support polygon
+
+    polygon = support_polyhedron.support_polygon;
+
+
+    %% Transform ZMP into polygon plane coordinates
+
+    zmp3D = zmp.point(:);
+
+    plane_point = polygon.plane.point(:);
+
+    basis = polygon.plane.basis;
+
+
+    relative = zmp3D - plane_point;
+
+    zmp2D = relative' * basis;
+
+
+    %% Find closest point on polygon boundary
+
+    vertices = polygon.vertices2D;
+
+    n = size(vertices,1);
+
+    minDistance = inf;
+
+    closest2D = zeros(1,2);
+
+
+    for i = 1:n
+
+        p1 = vertices(i,:);
+
+        if i == n
+            p2 = vertices(1,:);
+        else
+            p2 = vertices(i+1,:);
+        end
+
+
+        edge = p2 - p1;
+
+        edgeLengthSquared = dot(edge,edge);
+
+
+        % Projection onto edge
+
+        if edgeLengthSquared > eps
+
+            t = dot(zmp2D-p1,edge) / edgeLengthSquared;
+
+            t = max(0,min(1,t));
+
+        else
+
+            t = 0;
+
+        end
+
+
+        closest = p1 + t*edge;
+
+
+        d = norm(zmp2D-closest);
+
+
+        if d < minDistance
+
+            minDistance = d;
+            closest2D = closest;
+
+        end
+
+    end
+
+
+    %% Determine inside/outside
+
+    inside = inpolygon(...
+        zmp2D(1),...
+        zmp2D(2),...
+        vertices(:,1),...
+        vertices(:,2));
+
+
+    if inside
+        distance = minDistance;
+    else
+        distance = -minDistance;
+    end
+
+
+    %% Transform closest point back to 3D
+
+    closest3D = plane_point + basis*closest2D';
+
+
+    closest_points.zmp = zmp3D';
+
+    closest_points.closest = closest3D';
+
+
+    if visualise
+        visualize_ZMP_distance(distance,closest_points);
+    end
+
+end
+
+function visualize_ZMP_distance(distance,closest_points)
+    % Assume figure already exists
+
+    hold on;
+
+
+    plot3(...
+        [closest_points.zmp(1) closest_points.closest(1)],...
+        [closest_points.zmp(2) closest_points.closest(2)],...
+        [closest_points.zmp(3) closest_points.closest(3)],...
+        'r',...
+        'LineWidth',2);
+
+
+    scatter3(...
+        closest_points.closest(1),...
+        closest_points.closest(2),...
+        closest_points.closest(3),...
+        80,...
+        'g',...
+        'filled');
+
+
+    text(...
+        closest_points.closest(1),...
+        closest_points.closest(2),...
+        closest_points.closest(3),...
+        sprintf(' %.3f m',distance));
 end

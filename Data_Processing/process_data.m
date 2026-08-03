@@ -13,6 +13,7 @@ dataReg = getDataReg(dataRegPath);
  clearPlots = processDataParams.clearPlots;
  detachSeverity = processDataParams.detachSeverity;
  calculationMethod = processDataParams.calculationMethod;
+ adhoc = processDataParams.adhoc;
 
 if isempty(selectedIdxs)
     return;
@@ -166,7 +167,9 @@ for selectionIdx = 1:numel(selectedIdxs)
     
 end
 
-results = build_results_table(dataDir,detachSeverity);
-displayTableAndSaveCSV(results,detachSeverity);
+if adhoc
+    results = build_results_table(dataDir,detachSeverity);
+    displayTableAndSaveCSV(results,detachSeverity);
+end
 
 end
