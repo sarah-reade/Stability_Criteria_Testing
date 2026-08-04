@@ -35,83 +35,85 @@ function createBarGraph(rootDir,outDir)
         0.6784 0.5765 0.7608   % #ad93c2 (muted purple)
     ];
 
-    % for i = 1:length(every_result)
-    %     all_results = every_result{i};
+    for i = 1:length(every_result)
+        all_results = every_result{i};
 
-    %     if ~istable(all_results) || isempty(all_results)
-    %         % Not a table or empty table
-    %         warning(sprintf('%s table not found',program_list(i)))
-    %         continue;
-    %     end
+        if ~istable(all_results) || isempty(all_results)
+            % Not a table or empty table
+            warning(sprintf('%s table not found',program_list(i)))
+            continue;
+        end
 
-    %     % Rename configurations in all_results
-    %     all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
-    %     all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
-    %     all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
-
-
-    %     %% ============================================================
-    %     % 1. True Positive Rate vs Angle
-    %     % =============================================================
-
-    %     plot_TPR_comparison( ...
-    %         all_results, ...
-    %         configs, ...
-    %         barColours, ...
-    %         "Angle", ...
-    %         struct("EM_Config","all","Surface","all"));
+        % Rename configurations in all_results
+        all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
+        all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
+        all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
 
 
-    %     %% ============================================================
-    %     % 2. True Positive Rate vs EM Configuration
-    %     % =============================================================
+        %% ============================================================
+        % 1. True Positive Rate vs Angle
+        % =============================================================
 
-    %     plot_TPR_comparison( ...
-    %         all_results, ...
-    %         configs, ...
-    %         barColours(5:end,:), ...
-    %         "EM_Config", ...
-    %         struct("Angle","all","Surface","all"));
-
-
-    %     %% ============================================================
-    %     % 3. True Positive Rate vs Surface
-    %     % =============================================================
-
-    %     plot_TPR_comparison( ...
-    %         all_results, ...
-    %         configs, ...
-    %         barColours(7:end,:), ...
-    %         "Surface", ...
-    %         struct("Angle","all","EM_Config","all"));
+        plot_TPR_comparison( ...
+            all_results, ...
+            configs, ...
+            barColours, ...
+            "Angle", ...
+            struct("EM_Config","all","Surface","all"));
 
 
-    %     %% ============================================================
-    %     % 4. Full comparison: Configuration only
-    %     % =============================================================
+        %% ============================================================
+        % 2. True Positive Rate vs EM Configuration
+        % =============================================================
 
-    %     plot_TPR_configuration( ...
-    %         all_results, ...
-    %         configs, ...
-    %         barColours(10:end,:));
-
-    %     %% ============================================================
-    %     % Save all figures as .fig and .svg
-    %     % ============================================================
-
-    %     outDir_i = fullfile(outDir, program_list(i));
-
-    %     save_figures(outDir_i);
-    %     close all;
+        plot_TPR_comparison( ...
+            all_results, ...
+            configs, ...
+            barColours(5:end,:), ...
+            "EM_Config", ...
+            struct("Angle","all","Surface","all"));
 
 
-    % end
+        %% ============================================================
+        % 3. True Positive Rate vs Surface
+        % =============================================================
+
+        plot_TPR_comparison( ...
+            all_results, ...
+            configs, ...
+            barColours(7:end,:), ...
+            "Surface", ...
+            struct("Angle","all","EM_Config","all"));
+
+
+        %% ============================================================
+        % 4. Full comparison: Configuration only
+        % =============================================================
+
+        plot_TPR_configuration( ...
+            all_results, ...
+            configs, ...
+            barColours(10:end,:));
+
+        %% ============================================================
+        % Save all figures as .fig and .svg
+        % ============================================================
+
+        outDir_i = fullfile(outDir, program_list(i));
+
+        save_figures(outDir_i);
+        close all;
+
+
+    end
 
     plot_TPR_programs(every_result,program_list,barColours(5:end,:));
     plot_TPR_vs_X(every_result, program_list, barColours,'LoopTime_ms');
     plot_TPR_vs_X(every_result, program_list, barColours,'FalsePositiveRate');
     
     save_figures(outDir);
+
+    create_summary_csv(every_result, program_list, outDir);
 end
 
 function save_figures(outDir_i)
@@ -489,7 +491,7 @@ hold off
 end
 
 
-function plot_TPR_programs(every_results, program_list, barColours)
+function plot_TPR_programs(every_result, program_list, barColours)
 
 % ===========================
 % Plot settings
@@ -503,14 +505,14 @@ fontName = 'Times New Roman';
 % Extract data
 % ===========================
 
-Y = zeros(numel(every_results),3);
-TPR = zeros(numel(every_results),1);
-splitPct = zeros(numel(every_results),3);
+Y = zeros(numel(every_result),3);
+TPR = zeros(numel(every_result),1);
+splitPct = zeros(numel(every_result),3);
 
 
-for i = 1:numel(every_results)
+for i = 1:numel(every_result)
 
-    all_results = every_results{i};
+    all_results = every_result{i};
 
     % Skip missing data
     if ~istable(all_results) || isempty(all_results)
@@ -654,7 +656,7 @@ hold off
 
 end
 
-function plot_TPR_vs_X(every_results, program_list, markerColours, xVariable)
+function plot_TPR_vs_X(every_result, program_list, markerColours, xVariable)
 
 % ===========================
 % Plot settings
@@ -668,13 +670,13 @@ fontName = 'Times New Roman';
 % Extract data
 % ===========================
 
-TPR = zeros(numel(every_results),1);
-X = zeros(numel(every_results),1);
+TPR = zeros(numel(every_result),1);
+X = zeros(numel(every_result),1);
 
 
-for i = 1:numel(every_results)
+for i = 1:numel(every_result)
 
-    all_results = every_results{i};
+    all_results = every_result{i};
 
     if ~istable(all_results) || isempty(all_results)
         continue
@@ -786,5 +788,79 @@ ax.FontSize = fontSize;
 ax.FontName = fontName;
 
 hold off
+
+end
+
+function create_summary_csv(every_result, program_list, outDir)
+
+    % Preallocate
+    summary = table( ...
+        strings(numel(every_result),1), ...
+        zeros(numel(every_result),1), ...
+        zeros(numel(every_result),1), ...
+        zeros(numel(every_result),1), ...
+        'VariableNames', { ...
+            'Method', ...
+            'TruePositiveRate', ...
+            'FalsePositiveRate', ...
+            'LoopTime'});
+
+
+    for i = 1:numel(every_result)
+
+        all_results = every_result{i};
+
+        % Store method name
+        summary.Method(i) = program_list(i);
+
+
+        % Skip missing tables
+        if ~istable(all_results) || isempty(all_results)
+            summary.TruePositiveRate(i) = NaN;
+            summary.FalsePositiveRate(i) = NaN;
+            summary.LoopTime(i) = NaN;
+            continue
+        end
+
+
+        % Same filtering as your plots
+        t = all_results( ...
+            strcmp(all_results.Surface,"all") & ...
+            strcmp(all_results.EM_Config,"all") & ...
+            ~strcmp(all_results.Angle,"all"), :);
+
+
+        if isempty(t)
+            summary.TruePositiveRate(i) = NaN;
+            summary.FalsePositiveRate(i) = NaN;
+            summary.LoopTime(i) = NaN;
+            continue
+        end
+
+
+        % Average values
+        T = groupsummary(t, ...
+            {}, ...
+            'mean', ...
+            {'TruePositiveRate','FalsePositiveRate','LoopTime_ms'});
+
+
+        summary.TruePositiveRate(i) = T.mean_TruePositiveRate;
+        summary.FalsePositiveRate(i) = T.mean_FalsePositiveRate;
+        summary.LoopTime(i) = T.mean_LoopTime_ms;
+
+    end
+
+
+    % Save CSV
+    if ~exist(outDir,'dir')
+        mkdir(outDir)
+    end
+
+    filename = fullfile(outDir,'summary_results.csv');
+
+    writetable(summary, filename);
+
+    fprintf('Summary table saved: %s\n', filename)
 
 end
