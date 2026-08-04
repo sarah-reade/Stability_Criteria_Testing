@@ -7,7 +7,7 @@ function outDir = saveData(csvMeta,overwrite,time,wrench,imuData,variables,gamma
     export_sensor_dataset_csv( outDir, ...
        time,wrench,imuData,variables,gamma_out,all_beta,motionTimepoints,loop_time);
     
-    ppdata = post_process(outDir+"/data.csv",parameters.reff,10,10);
+    ppdata = post_process(outDir+"/data.csv",parameters.reff,0,10);
 
     save_meta_data(outDir, 'metaData.txt', selectedRecord,parameters,scriptParameters,ppdata)
 end
@@ -188,8 +188,13 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '---------------- SCRIPT PARAMETERS -----------------\n');
     fprintf(fid, 'hz    : %.6f\n', hz);
     fprintf(fid, '---------- IMU Thresholds:\n');
-    fprintf(fid, 'linThresholds    : %.10f [any motion,full detachment]\n', imu_linThresh);
-    fprintf(fid, 'gyrThresholds    : %.10f [any motion,full detachment]\n', imu_gyrThresh);
+
+    fprintf(fid, 'linThresholds    : %.10f [any motion]\n', imu_linThresh(1));
+    fprintf(fid, '                  %.10f [full detachment]\n', imu_linThresh(2));
+
+    fprintf(fid, 'gyrThresholds    : %.10f [any motion]\n', imu_gyrThresh(1));
+    fprintf(fid, '                  %.10f [full detachment]\n', imu_gyrThresh(2));
+
     fprintf(fid, 'wrenchThreshold      : %.10f\n', imu_wrenchThreshold);
     fprintf(fid, 'refractoryPeriod  : %.10f\n', imu_refPer);
 
@@ -242,6 +247,9 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, '%.6f %%\n', ppdata.securelyAttached.w_margin_std);
     fprintf(fid, '\n');
 
+    fprintf(fid, 'Time Attached                  : %.6f s\n', ppdata.securelyAttached.time_attached);
+    fprintf(fid, 'False Positive Rate            : %.6f %%\n', ppdata.securelyAttached.false_positive_rate);
+    fprintf(fid, '\n');
 
     fprintf(fid, '---- Full Detachment ----\n');
     fprintf(fid, 'Number of Detachment Events      : %d\n', ppdata.attached.detached_count);
@@ -258,6 +266,10 @@ function save_meta_data(folder, filename, selectedRecord,parameters, scriptParam
     fprintf(fid, 'Mean W Margin                   : %.6f\n', ppdata.attached.w_margin);
     fprintf(fid, 'W Margin STDDEV                 : ');
     fprintf(fid, '%.6f %%\n', ppdata.attached.w_margin_std);
+    fprintf(fid, '\n');
+
+    fprintf(fid, 'Time Attached                  : %.6f s\n', ppdata.attached.time_attached);
+    fprintf(fid, 'False Positive Rate            : %.6f %%\n', ppdata.attached.false_positive_rate);
     fprintf(fid, '\n');
 
     fprintf(fid, '---- Loop Data ----\n');

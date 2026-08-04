@@ -26,6 +26,8 @@ function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(paramete
         case 'SOCPZML'
             [variables,gamma_cnstr,beta,all_beta] = SOCPZML(parameters,wrench);
         case 'QPZML'
+            [variables,gamma_cnstr] = QPZML(parameters,wrench);
+            beta = gamma_cnstr;
             
     end
 end

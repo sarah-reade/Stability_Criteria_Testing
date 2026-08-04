@@ -1,4 +1,4 @@
-function displayTableAndSaveCSV(inputTable,detachSeverity)
+function displayTableAndSaveCSV(inputTable,detachSeverity,calculationMethod)
 
     % Create UI window
     fig = uifigure('Name', sprintf('Table Viewer - Detach Severity: %s',detachSeverity), ...
@@ -13,15 +13,18 @@ function displayTableAndSaveCSV(inputTable,detachSeverity)
     btn = uibutton(fig, ...
                    'Text', 'Save CSV', ...
                    'Position', [20 20 100 30], ...
-                   'ButtonPushedFcn', @(src,event) saveCSV(inputTable));
+                   'ButtonPushedFcn', @(src,event) saveCSV(inputTable,detachSeverity,calculationMethod));
 
 end
 
 
-function saveCSV(inputTable)
+function saveCSV(inputTable,detachSeverity,calculationMethod)
+
+    % Default filename
+    defaultName = sprintf('%s_%s.csv', calculationMethod, detachSeverity);
 
     % Ask user where to save
-    [file, path] = uiputfile('*.csv', 'Save Table As');
+    [file, path] = uiputfile('*.csv', 'Save Table As', defaultName);
 
     % User cancelled
     if isequal(file,0)

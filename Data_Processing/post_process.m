@@ -159,6 +159,57 @@ function ppdata = getTruePositiveandWMargin(data,reff,g_margin,w_margin,attachSt
     %% Average required margin
     ppdata.w_margin = mean(w_margin_values);
     ppdata.w_margin_std = std(w_margin_values);
+
+
+    %% ---------------- Calculate time negative while attached ----------------
+
+    % Initialise attached mask
+    attach_mask = false(size(t));
+
+    % Mark all attached intervals
+    for k = 1:num_segments-1
+        
+        % Samples between reattachment and next detachment are attached
+        attach_idx_start = find(t == detached_end(k),1);
+        attach_idx_end   = find(t == detached_start(k+1),1);
+
+        if isempty(attach_idx_start)
+            attach_idx_start = 1;
+        end
+
+        if isempty(attach_idx_end)
+            attach_idx_end = length(t);
+        end
+
+        attach_mask(attach_idx_start:attach_idx_end) = true;
+
+    end
+
+
+    % Negative gamma while attached
+    time_negative_mask = (gamma < g_margin) & attach_mask;
+
+
+    % Calculate durations using time vector
+    dt = mean(diff(t));   % sample period
+
+    time_negative = sum(time_negative_mask) * dt;
+
+    time_attached = sum(attach_mask) * dt;
+
+
+    % Percentage of attached time incorrectly negative
+    if time_attached > 0
+        percent_negative = 100 * time_negative / time_attached;
+    else
+        percent_negative = NaN;
+    end
+
+
+    ppdata.time_attached = time_attached;
+    ppdata.false_positive_rate = percent_negative;
+
+
 end
 
 function trigger = getLowestGammaTrigger(data, i)

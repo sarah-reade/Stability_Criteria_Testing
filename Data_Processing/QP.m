@@ -41,7 +41,7 @@ function [x,gamma_cnstr] = solveQP(parameters,wrench)
     % Linear inequalities
     % -----------------------------
 
-    nSides = 8;                     % choose 4,8,16,...
+    nSides = 16;                     % choose 4,8,16,...
     dirs = polygonDirections(nSides);
 
     nrow = nc*(1 + nSides + 2 + nSides);    % normal + friction + tipping

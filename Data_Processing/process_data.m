@@ -15,9 +15,9 @@ dataReg = getDataReg(dataRegPath);
  calculationMethod = processDataParams.calculationMethod;
  adhoc = processDataParams.adhoc;
 
-if isempty(selectedIdxs)
-    return;
-end
+% if isempty(selectedIdxs)
+%     return;
+% end
 
 
 for selectionIdx = 1:numel(selectedIdxs)
@@ -169,7 +169,7 @@ end
 
 if adhoc
     results = build_results_table(dataDir,detachSeverity);
-    displayTableAndSaveCSV(results,detachSeverity);
+    displayTableAndSaveCSV(results,detachSeverity,calculationMethod);
 end
 
 end

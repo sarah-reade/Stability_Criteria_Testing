@@ -501,49 +501,36 @@ function visualize_ZML_distance(closestPoints, dmin)
 
 end
 
-function zmp = calculate_ZMP(wrench,plane, visualise)
+function zmp = calculate_ZMP(wrench, plane, visualise)
 
     if nargin < 3
         visualise = false;
     end
 
-    F = wrench(1:3);
-    M = wrench(4:6);
+    % Calculate Zero Moment Line
+    zml = calculate_ZML(wrench, false);
 
-
-    if abs(F(3)) < 1e-9
-        error('Cannot calculate ZMP: vertical force is zero');
-    end
-
-
-    % ZMP line of action:
-    %
-    % r = [ -My/Fz
-    %        Mx/Fz
-    %        0 ] + alpha*[0 0 1]
-    %
-    % Find intersection with support plane:
-    % n.(r-plane.point)=0
-
-    zmp0 = [
-        -M(2)/F(3);
-        M(1)/F(3);
-        0
-    ];
-
-
-    line_direction = [0;0;1];
-
-
+    % Plane definition
     plane_point = plane.point(:);
     plane_normal = plane.normal(:);
 
+    % ZML:
+    % r = zml.origin + lambda*zml.direction
+    %
+    % Intersection with plane:
+    % n.(r - plane.point) = 0
 
-    alpha = dot(plane_normal, plane_point - zmp0) / ...
-            dot(plane_normal, line_direction);
+    denominator = dot(plane_normal, zml.direction);
+
+    if abs(denominator) < 1e-9
+        error('Cannot calculate ZMP: ZML is parallel to support plane');
+    end
+
+    lambda = dot(plane_normal, plane_point - zml.origin) / denominator;
 
 
-    zmp.point = zmp0 + alpha*line_direction;
+    % Intersection point
+    zmp.point = zml.origin + lambda*zml.direction;
 
 
     zmp.x = zmp.point(1);
@@ -551,16 +538,23 @@ function zmp = calculate_ZMP(wrench,plane, visualise)
     zmp.z = zmp.point(3);
 
 
+    % Store ZML too (useful for visualisation)
+    zmp.zml = zml;
+
+
     if visualise
-        visualise_ZMP(zmp)
+        visualise_ZMP(zmp, plane)
     end
 
 end
 
-function visualise_ZMP(zmp)
+function visualise_ZMP(zmp, plane)
+
     % Assume figure already exists
     hold on;
+    axis equal;
 
+    %% Plot ZMP
     scatter3(...
         zmp.point(1),...
         zmp.point(2),...
@@ -575,6 +569,46 @@ function visualise_ZMP(zmp)
         zmp.point(2),...
         zmp.point(3),...
         ' ZMP');
+
+    %% Draw plane
+    p = plane.point(:);
+
+    % Two basis vectors spanning the plane
+    e1 = plane.basis(:,1);
+    e2 = plane.basis(:,2);
+
+    % Size of displayed plane
+    L = 0.3;    % Adjust as required
+
+    % Four corners of a square on the plane
+    corners = [...
+        p + L*( e1 + e2), ...
+        p + L*( e1 - e2), ...
+        p + L*(-e1 - e2), ...
+        p + L*(-e1 + e2)];
+
+    patch(...
+        corners(1,:),...
+        corners(2,:),...
+        corners(3,:),...
+        'b',...
+        'FaceAlpha',0.2,...
+        'EdgeColor','b',...
+        'LineWidth',1.5);
+
+    %% Plot plane normal
+    quiver3(...
+        p(1), p(2), p(3), ...
+        plane.normal(1), plane.normal(2), plane.normal(3), ...
+        0.15,...
+        'k',...
+        'LineWidth',2,...
+        'MaxHeadSize',0.5);
+
+    xlabel('X');
+    ylabel('Y');
+    zlabel('Z');
+    grid on;
 end
 
 function [distance,closest_points] = distance_ZMP_to_polygon(...
