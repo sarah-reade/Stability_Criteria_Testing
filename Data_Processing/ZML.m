@@ -33,7 +33,7 @@ function [gamma,all_beta,loopTime] = ZML(parameters,wrench)
             zml,visualise);
     end
 
-    loopTime = tok(tStart);
+    loopTime = toc(tStart);
     
 
     if visualise

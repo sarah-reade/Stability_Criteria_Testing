@@ -1,4 +1,4 @@
-function process_data(runSelection)
+function process_data(runSelection,processDataParams)
 %PLOT_FORCE_SENSOR Select a registered force sensor dataset and plot it.
 if nargin < 1
     runSelection = true;
@@ -13,26 +13,36 @@ dataReg = getDataReg(dataRegPath);
 
 calculationMethods = {'SOCP', 'QP4', 'QP8', 'QP16', 'QP32','ZML', 'SOCPZML', 'QP8ZML'};
 
+
 if runSelection
     [processDataParams,selectedIdxs] = runSelectionUi(dataReg,calculationMethods);
-    overwrite = processDataParams.overwrite;
-    clearPlots = processDataParams.clearPlots;
-    makePlots = processDataParams.makePlots;
-    detachSeverity = processDataParams.detachSeverity;
-    calculationMethod = processDataParams.calculationMethod;
-    adhoc = processDataParams.adhoc;
     autosave_adhoc = false;
-else
+elseif nargin < 2
     for i = 1:length(calculationMethods)
-        calculationMethod = calculationMethods{i};
-        overwrite = true;
-        clearPlots = true;
-        makePlots = false;
-        detachSeverity = 'Motion';
-        adhoc = true;
-        autosave_adhoc = true;
+        processDataParams.calculationMethod = calculationMethods{i};
+        processDataParams.overwrite = true;
+        processDataParams.clearPlots = true;
+        processDataParams.makePlots = false;
+        processDataParams.detachSeverity = 'Motion';
+        processDataParams.adhoc = true;
+        processDataParams.autosave_adhoc = true;
+        processDataParams.selectedIdxs = (1:height(dataReg));
+        process_data(false,processDataParams);
     end
+
+    return
+else
+    selectedIdxs = processDataParams.selectedIdxs;
+    autosave_adhoc = processDataParams.autosave_adhoc;
 end
+
+overwrite = processDataParams.overwrite;
+clearPlots = processDataParams.clearPlots;
+makePlots = processDataParams.makePlots;
+detachSeverity = processDataParams.detachSeverity;
+calculationMethod = processDataParams.calculationMethod;
+adhoc = processDataParams.adhoc;
+
 
 % if isempty(selectedIdxs)
 %     return;
@@ -40,7 +50,6 @@ end
 
 
 for selectionIdx = 1:numel(selectedIdxs)
-
     selectedIdx = selectedIdxs(selectionIdx);   % force scalar index
     selectedRecord = dataReg(selectedIdx, :);
     fscsvFilename = string(selectedRecord.('Force Sensor Filename')) + ".csv";

@@ -4,7 +4,7 @@ function [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCPZML(parameters,wre
     [variables,gamma_cnstr] = obtain_gamma_cnstr(parameters,wrench);
     zml_dist = ZML(parameters,wrench);
     gamma_cnstr = min(gamma_cnstr,zml_dist);
-    loopTime = tok(tStart);
+    loopTime = toc(tStart);
 
     [beta,all_beta] = get_beta(variables,zml_dist,parameters);
 end

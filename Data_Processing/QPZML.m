@@ -1,16 +1,19 @@
-function [variables,gamma_cnstr,beta,all_beta,loopTime] = QPZML(parameters,wrench)
+function [variables,gamma_cnstr,beta,all_beta,loopTime] = QPZML(parameters,wrench,nSides)
+    if nargin < 3
+        nSides = 8;
+    end
 
     tStart = tic;
-    [variables,gamma_cnstr] = solveQP(parameters,wrench);
+    [variables,gamma_cnstr] = solveQP(parameters,wrench,nSides);
     zml_dist = ZML(parameters,wrench);
     gamma_cnstr = min(gamma_cnstr,zml_dist);
-    loopTime = tok(tStart);
+    loopTime = toc(tStart);
 
-    [gamma_cnstr,all_beta] = get_beta(variables,zml_dist,parameters);
+    [gamma_cnstr,all_beta] = get_beta(variables,zml_dist,parameters,nSides);
     beta = gamma_cnstr;
 end
 
-function [x,gamma_cnstr] = solveQP(parameters,wrench)
+function [x,gamma_cnstr] = solveQP(parameters,wrench,nSides)
     % -----------------------------
     % Extract parameters
     % -----------------------------
@@ -49,7 +52,6 @@ function [x,gamma_cnstr] = solveQP(parameters,wrench)
     % Linear inequalities
     % -----------------------------
 
-    nSides = 8;                     % choose 4,8,16,...
     dirs = polygonDirections(nSides);
 
     nrow = nc*(1 + nSides + 2 + nSides);    % normal + friction + tipping
@@ -145,7 +147,7 @@ theta = (0:nSides-1)'*2*pi/nSides;
 D = [cos(theta) sin(theta)];
 end
 
-function [beta,all_beta] = get_beta(x, zml_dist, parameters)
+function [beta,all_beta] = get_beta(x, zml_dist, parameters,nSides)
 
     nc    = numel(parameters.c);
     mu    = parameters.mu;
@@ -156,7 +158,6 @@ function [beta,all_beta] = get_beta(x, zml_dist, parameters)
 
     gamma = x(end);
 
-    nSides = 16;
     dirs = polygonDirections(nSides);
 
     all_beta = zeros(3,nc);

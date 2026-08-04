@@ -2,10 +2,9 @@ function [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,n
     
     tStart = tic;
     [variables,gamma_cnstr] = solveQP(parameters,wrench,nSides);
-    loopTime = tok(tStart);
+    loopTime = toc(tStart);
     beta = gamma_cnstr;
-    all_beta = get_beta(variables,parameters);
-    keyboard
+    all_beta = get_beta(variables,parameters,nSides);
 end
 
 function [x,gamma_cnstr] = solveQP(parameters,wrench,nSides)
@@ -163,7 +162,7 @@ D = [cos(theta) sin(theta)];
 end
 
 
-function all_beta = get_beta(x, parameters)
+function all_beta = get_beta(x, parameters,nSides)
 
     nc    = numel(parameters.c);
     mu    = parameters.mu;
@@ -174,7 +173,6 @@ function all_beta = get_beta(x, parameters)
 
     gamma = x(end);
 
-    nSides = 4;
     dirs = polygonDirections(nSides);
 
     all_beta = zeros(3,nc);

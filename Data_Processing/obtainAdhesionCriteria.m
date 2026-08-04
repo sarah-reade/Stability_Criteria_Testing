@@ -30,8 +30,11 @@ function [variables,gamma_cnstr,beta,all_beta,loopTime] = obtainAdhesionCriteria
             [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,32);
         case 'SOCPZML'
             [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCPZML(parameters,wrench);
-        case 'QPZML'
-            [variables,gamma_cnstr,beta,all_beta,loopTime] = QPZML(parameters,wrench);            
+        case 'QP8ZML'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QPZML(parameters,wrench,8);    
+        otherwise
+            loopTime = NaN;
+            error('Invalid method: %s. Valid methods are SOCP, ZML, QP4, QP8, QP16, QP32, SOCPZML, QPZML.', method);
     end
 end
 
