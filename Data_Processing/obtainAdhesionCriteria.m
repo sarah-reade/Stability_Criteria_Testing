@@ -1,4 +1,4 @@
-function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(parameters,wrench,method)
+function [variables,gamma_cnstr,beta,all_beta,loopTime] = obtainAdhesionCriteria(parameters,wrench,method)
     if nargin < 3
         method = 'SOCP';
     end
@@ -16,19 +16,22 @@ function [variables,gamma_cnstr,beta,all_beta] = obtainAdhesionCriteria(paramete
     % Calculate gamma
     switch method
         case 'SOCP'
-            [variables,gamma_cnstr,beta,all_beta] = SOCP(parameters,wrench);
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCP(parameters,wrench);
         case 'ZML'
-            gamma_cnstr = ZML(parameters,wrench);
+            [gamma_cnstr,all_beta,loopTime] = ZML(parameters,wrench);
             beta = gamma_cnstr;
-        case 'QP'
-            [variables,gamma_cnstr] = QP(parameters,wrench);
-            beta = gamma_cnstr;
+        case 'QP4'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,4);
+        case 'QP8'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,8);
+        case 'QP16'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,16);
+        case 'QP32'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,32);
         case 'SOCPZML'
-            [variables,gamma_cnstr,beta,all_beta] = SOCPZML(parameters,wrench);
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCPZML(parameters,wrench);
         case 'QPZML'
-            [variables,gamma_cnstr] = QPZML(parameters,wrench);
-            beta = gamma_cnstr;
-            
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QPZML(parameters,wrench);            
     end
 end
 

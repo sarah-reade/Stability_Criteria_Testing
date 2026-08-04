@@ -1,4 +1,4 @@
-function [processDataParams,selectedIdxs] = runSelectionUi(dataReg)
+function [processDataParams,selectedIdxs] = runSelectionUi(dataReg,calculationMethods)
 
     if height(dataReg) == 0
         errordlg('No valid entries exist in Data_Reg.csv.', 'No Data Available');
@@ -7,10 +7,11 @@ function [processDataParams,selectedIdxs] = runSelectionUi(dataReg)
 
     displayItems = buildDisplayItems(dataReg);
     infoItems = buildInfoItems(dataReg);
-    [overwrite,plots,detachSeverity,calculationMethod,adhoc,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg);
+    [overwrite,plots,detachSeverity,calculationMethod,adhoc,makePlots,selectedIdxs] = runSelectionDialog(displayItems, infoItems, dataReg,calculationMethods);
     
     processDataParams.overwrite = overwrite;
     processDataParams.clearPlots = plots;
+    processDataParams.makePlots = makePlots;
     processDataParams.adhoc = adhoc;
     processDataParams.detachSeverity = detachSeverity;
     processDataParams.calculationMethod = calculationMethod;
@@ -62,7 +63,7 @@ end
 
 end
 
-function [overwrite,plots,detachSeverity,calculationMethod,adhoc,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg)
+function [overwrite,plots,detachSeverity,calculationMethod,adhoc,makePlots,selectedIdx] = runSelectionDialog(displayItems, infoItems, dataReg,calculationMethods)
 % Single-figure selector with persistent manual and rule-based selection.
 
 selectedIdx = [];
@@ -71,6 +72,7 @@ settings = loadSelectionSettings();
 overwrite = settings.overwrite;
 plots = settings.plots;
 adhoc = settings.adhoc;
+makePlots = settings.makePlots;
 detachSeverity = settings.detachSeverity;
 calculationMethod = settings.calculationMethod;
 
@@ -154,7 +156,7 @@ surfaceDropDown = uidropdown(filterGrid, ...
 filterGrid = uigridlayout(mainGridLayout, [1 6]);
 filterGrid.Layout.Row = 3;
 
-filterGrid.ColumnWidth = {120, '1x',120, '1x',150, 40,80, 40, 120,40};
+filterGrid.ColumnWidth = {120, '1x',120, '1x',150, 40,80, 40,80, 40, 120,40};
 filterGrid.RowHeight = {24};
 
 uilabel(filterGrid, 'Text', 'Detachment Severity', ...
@@ -166,7 +168,7 @@ detachmentDropDown = uidropdown(filterGrid, ...
 uilabel(filterGrid, 'Text', 'Calculation Method', ...
     'HorizontalAlignment', 'right');
 calculationDropDown = uidropdown(filterGrid, ...
-    'Items', {'SOCP', 'QP', 'ZML','SOCP-ZML','QP-ZML'}, ...
+    'Items', calculationMethods, ...
     'Value', settings.calculationMethod');
 
 uilabel(filterGrid, ...
@@ -182,6 +184,13 @@ uilabel(filterGrid, ...
 plotsCheckbox = uicheckbox(filterGrid, ...
     'Text', '', ...
     'Value', settings.plots);
+
+uilabel(filterGrid, ...
+    'Text', sprintf('Make Plots?'), ...
+    'HorizontalAlignment', 'right');
+makePlotsCheckbox = uicheckbox(filterGrid, ...
+    'Text', '', ...
+    'Value', settings.makePlots);
 
 uilabel(filterGrid, ...
     'Text', sprintf('AdHoc Processing'), ...
@@ -239,6 +248,7 @@ if isvalid(selectionFig)
     end
     overwrite = overwriteCheckbox.Value;
     plots = plotsCheckbox.Value;
+    makePlots = makePlotsCheckbox.Value;
     adhoc = adhocCheckbox.Value;
     detachSeverity = detachmentDropDown.Value;
 
@@ -266,6 +276,7 @@ end
             'Surface', "All", ...
             'overwrite', true, ...
             'plots', false, ...
+            'makePlots', false, ...
             'adhoc', false, ...
             'detachSeverity', "Any Motion", ...
             'calculationMethod', "SOCP");
@@ -294,6 +305,7 @@ end
 
         settings.overwrite = overwriteCheckbox.Value;
         settings.plots = plotsCheckbox.Value;
+        settings.makePlots = makePlotsCheckbox.Value;
         settings.adhoc = adhocCheckbox.Value;
 
         settings.detachSeverity = string(detachmentDropDown.Value);

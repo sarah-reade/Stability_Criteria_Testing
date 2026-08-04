@@ -1,5 +1,8 @@
-function process_data()
+function process_data(runSelection)
 %PLOT_FORCE_SENSOR Select a registered force sensor dataset and plot it.
+if nargin < 1
+    runSelection = true;
+end
 
 % Resolve data paths relative to this script so the function is portable.
 scriptDir = fileparts(mfilename('fullpath'));
@@ -8,12 +11,28 @@ dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
 
 dataReg = getDataReg(dataRegPath);
 
-[processDataParams,selectedIdxs] = runSelectionUi(dataReg);
- overwrite = processDataParams.overwrite;
- clearPlots = processDataParams.clearPlots;
- detachSeverity = processDataParams.detachSeverity;
- calculationMethod = processDataParams.calculationMethod;
- adhoc = processDataParams.adhoc;
+calculationMethods = {'SOCP', 'QP4', 'QP8', 'QP16', 'QP32','ZML', 'SOCPZML', 'QP8ZML'};
+
+if runSelection
+    [processDataParams,selectedIdxs] = runSelectionUi(dataReg,calculationMethods);
+    overwrite = processDataParams.overwrite;
+    clearPlots = processDataParams.clearPlots;
+    makePlots = processDataParams.makePlots;
+    detachSeverity = processDataParams.detachSeverity;
+    calculationMethod = processDataParams.calculationMethod;
+    adhoc = processDataParams.adhoc;
+    autosave_adhoc = false;
+else
+    for i = 1:length(calculationMethods)
+        calculationMethod = calculationMethods{i};
+        overwrite = true;
+        clearPlots = true;
+        makePlots = false;
+        detachSeverity = 'Motion';
+        adhoc = true;
+        autosave_adhoc = true;
+    end
+end
 
 % if isempty(selectedIdxs)
 %     return;
@@ -102,9 +121,8 @@ for selectionIdx = 1:numel(selectedIdxs)
     try 
 
         for sampleIdx = 1:height(wrench)
-            tStart = tic;
-            [variables(sampleIdx,:),gamma_cnstr(sampleIdx),beta(sampleIdx),all_beta(sampleIdx,:,:)] = obtainAdhesionCriteria(parameters,wrench(sampleIdx,:)',calculationMethod);
-            loop_time(sampleIdx) = toc(tStart);
+            [variables(sampleIdx,:),gamma_cnstr(sampleIdx),beta(sampleIdx),all_beta(sampleIdx,:,:),looptime] = obtainAdhesionCriteria(parameters,wrench(sampleIdx,:)',calculationMethod);
+            loop_time(sampleIdx) = looptime;
         end
         
     catch ME
@@ -129,6 +147,10 @@ for selectionIdx = 1:numel(selectedIdxs)
         continue;
     end
     
+    if ~makePlots
+        continue
+    end
+
     margin = 0;
     
     try 
@@ -169,7 +191,7 @@ end
 
 if adhoc
     results = build_results_table(dataDir,detachSeverity);
-    displayTableAndSaveCSV(results,detachSeverity,calculationMethod);
+    displayTableAndSaveCSV(results,detachSeverity,calculationMethod,autosave_adhoc);
 end
 
 end

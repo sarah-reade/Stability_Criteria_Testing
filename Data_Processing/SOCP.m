@@ -1,5 +1,8 @@
-function [variables,gamma_cnstr,beta,all_beta] = SOCP(parameters,wrench)
+function [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCP(parameters,wrench)
+
+    tStart = tic;
     [variables,gamma_cnstr] = obtain_gamma_cnstr(parameters,wrench);
+    loopTime = tok(tStart);
     [beta,all_beta] = get_beta(variables,parameters);
 end
 

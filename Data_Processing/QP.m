@@ -1,8 +1,14 @@
-function [variables,gamma_cnstr] = QP(parameters,wrench)
-    [variables,gamma_cnstr] = solveQP(parameters,wrench);
+function [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,nSides)
+    
+    tStart = tic;
+    [variables,gamma_cnstr] = solveQP(parameters,wrench,nSides);
+    loopTime = tok(tStart);
+    beta = gamma_cnstr;
+    all_beta = get_beta(variables,parameters);
+    keyboard
 end
 
-function [x,gamma_cnstr] = solveQP(parameters,wrench)
+function [x,gamma_cnstr] = solveQP(parameters,wrench,nSides)
     % -----------------------------
     % Extract parameters
     % -----------------------------
@@ -41,7 +47,6 @@ function [x,gamma_cnstr] = solveQP(parameters,wrench)
     % Linear inequalities
     % -----------------------------
 
-    nSides = 16;                     % choose 4,8,16,...
     dirs = polygonDirections(nSides);
 
     nrow = nc*(1 + nSides + 2 + nSides);    % normal + friction + tipping
@@ -155,4 +160,124 @@ function D = polygonDirections(nSides)
 theta = (0:nSides-1)'*2*pi/nSides;
 
 D = [cos(theta) sin(theta)];
+end
+
+
+function all_beta = get_beta(x, parameters)
+
+    nc    = numel(parameters.c);
+    mu    = parameters.mu;
+    r_x   = parameters.r_x;
+    r_y   = parameters.r_y;
+    reff  = parameters.reff;
+    Fa    = parameters.s .* parameters.Fd;
+
+    gamma = x(end);
+
+    nSides = 4;
+    dirs = polygonDirections(nSides);
+
+    all_beta = zeros(3,nc);
+
+
+    for i = 1:nc
+
+        cols = (6*(i-1)+1):(6*i);
+
+        fx = x(cols(1));
+        fy = x(cols(2));
+        fz = x(cols(3));
+        mx = x(cols(4));
+        my = x(cols(5));
+        mz = x(cols(6));
+
+
+        %% -------------------------
+        % Normal force
+        % Same as SOCP:
+        % beta = Fa + fz - gamma
+        %% -------------------------
+
+        b_normal = Fa(i) + fz - gamma;
+
+
+        %% -------------------------
+        % Tipping
+        % Take minimum polygon face margin
+        %% -------------------------
+
+        tipping_beta = [];
+
+        for k = 1:nSides
+
+            dx = dirs(k,1);
+            dy = dirs(k,2);
+
+            b_tip = Fa(i) - ...
+                    (2*dx*mx/r_x + ...
+                     2*dy*my/r_y - ...
+                     fz + gamma);
+
+            tipping_beta = [tipping_beta; b_tip];
+
+        end
+
+        b_tipping = min(tipping_beta);
+
+
+
+        %% -------------------------
+        % Friction
+        % Combine tangential friction + mz
+        % Take minimum
+        %% -------------------------
+
+        friction_beta = [];
+
+
+        % friction pyramid
+        for k = 1:nSides
+
+            dx = dirs(k,1);
+            dy = dirs(k,2);
+
+            b_fric = mu*Fa(i) - ...
+                     (dx*fx + dy*fy - mu*fz + mu*gamma);
+
+            friction_beta = [friction_beta; b_fric];
+
+        end
+
+
+        % +mz
+        b_mz_pos = mu*Fa(i) - ...
+                   (mz/reff - mu*fz + mu*gamma);
+
+
+        % -mz
+        b_mz_neg = mu*Fa(i) - ...
+                   (-mz/reff - mu*fz + mu*gamma);
+
+
+        friction_beta = [friction_beta;
+                         b_mz_pos;
+                         b_mz_neg];
+
+
+        b_friction = min(friction_beta);
+
+
+
+        %% -------------------------
+        % Store same ordering as SOCP
+        %% -------------------------
+
+        all_beta(:,i) = [
+            b_normal;
+            b_tipping;
+            b_friction
+        ];
+
+    end
+
 end

@@ -1,4 +1,9 @@
-function displayTableAndSaveCSV(inputTable,detachSeverity,calculationMethod)
+function displayTableAndSaveCSV(inputTable,detachSeverity,calculationMethod,autosave)
+    
+    if autosave
+        saveCSV(inputTable,detachSeverity,calculationMethod,true)
+        return
+    end
 
     % Create UI window
     fig = uifigure('Name', sprintf('Table Viewer - Detach Severity: %s',detachSeverity), ...
@@ -18,10 +23,23 @@ function displayTableAndSaveCSV(inputTable,detachSeverity,calculationMethod)
 end
 
 
-function saveCSV(inputTable,detachSeverity,calculationMethod)
+function saveCSV(inputTable,detachSeverity,calculationMethod,autosave)
 
     % Default filename
     defaultName = sprintf('%s_%s.csv', calculationMethod, detachSeverity);
+
+    if autosave
+
+        resultsFolder = fullfile(pwd, 'Results');
+
+        if ~exist(resultsFolder, 'dir')
+            mkdir(resultsFolder);
+        end
+
+        writetable(inputTable, fullfile(resultsFolder, defaultName));
+
+        return
+    end
 
     % Ask user where to save
     [file, path] = uiputfile('*.csv', 'Save Table As', defaultName);

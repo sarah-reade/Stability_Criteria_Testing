@@ -1,5 +1,8 @@
-function gamma = ZML(parameters,wrench)
+function [gamma,all_beta,loopTime] = ZML(parameters,wrench)
+    
     visualise = false;
+
+    tStart = tic;
     persistent cachedParameters cachedSupportPolyhedron callCount
 
     % Recompute only if parameters have changed
@@ -29,11 +32,11 @@ function gamma = ZML(parameters,wrench)
             support_polyhedron,...
             zml,visualise);
     end
+
+    loopTime = tok(tStart);
     
 
     if visualise
-
-
         if isempty(callCount)
             callCount = 0;
         end
@@ -46,6 +49,8 @@ function gamma = ZML(parameters,wrench)
             keyboard
         end
     end
+
+    all_beta = get_beta(gamma,parameters);
 end
 
 function zml = calculate_ZML(wrench,visualise)
@@ -758,4 +763,13 @@ function visualize_ZMP_distance(distance,closest_points)
         closest_points.closest(2),...
         closest_points.closest(3),...
         sprintf(' %.3f m',distance));
+end
+
+
+function all_beta = get_beta(d,parameters)
+
+    nc    = numel(parameters.c);
+    all_beta = nan(3,nc);
+    all_beta(2,:) = d;
+
 end

@@ -1,90 +1,125 @@
-%% Build results table
-all_results = build_results_table;
+function createBarGraph(rootDir,outDir)
 
-%% Common configurations
-configs = [
-    "1 Contact" + char(160) + char(160)
-    "2 Planar Contacts" + repmat(char(160),1,17)
-    "2 Non-Planar Contacts" + repmat(char(160),1,8)
-];
+    if nargin < 1
+        rootDir = "Results";
+    end
 
-% Rename configurations in all_results
-all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
-all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
-all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
+    if nargin < 2
+        outDir = uigetdir(pwd, 'Select folder to save figures');
+    end
+
+    [every_result, program_list] = load_results_table(rootDir);
+    close all;
 
 
-%% Custom colours
-barColours = [
-    0.6863 0.7961 0.7843   % #afcbc8
-    0.7020 0.3373 0.0275   % #b35607
-    0.8549 0.7412 0.7451   % #dabdbe
-    0.4314 0.1804 0.2353   % #6e2e3c
-    0.9216 0.8902 0.8941   % #ebe3e4
-    0.4784 0.5647 0.6314   % #7a90a1
-    0.9255 0.7608 0.4627   % #ecc276
-    0.8157 0.6314 0.6392   % #d0a1a3
-    0.8549 0.8353 0.8627   % #dad5dc
-    0.4431 0.3451 0.3451   % #715858
-    0.4314 0.6078 0.5529   % #6e9b8d (muted teal-green)
-    0.6784 0.5765 0.7608   % #ad93c2 (muted purple)
-];
+    %% Common configurations
+    configs = [
+        "1 Contact" + char(160) + char(160)
+        "2 Planar Contacts" + repmat(char(160),1,17)
+        "2 Non-Planar Contacts" + repmat(char(160),1,8)
+    ];
+
+    % Custom colours
+    barColours = [
+        0.6863 0.7961 0.7843   % #afcbc8
+        0.7020 0.3373 0.0275   % #b35607
+        0.8549 0.7412 0.7451   % #dabdbe
+        0.4314 0.1804 0.2353   % #6e2e3c
+        0.9216 0.8902 0.8941   % #ebe3e4
+        0.4784 0.5647 0.6314   % #7a90a1
+        0.9255 0.7608 0.4627   % #ecc276
+        0.8157 0.6314 0.6392   % #d0a1a3
+        0.8549 0.8353 0.8627   % #dad5dc
+        0.4431 0.3451 0.3451   % #715858
+        0.4314 0.6078 0.5529   % #6e9b8d (muted teal-green)
+        0.6784 0.5765 0.7608   % #ad93c2 (muted purple)
+    ];
+
+    % for i = 1:length(every_result)
+    %     all_results = every_result{i};
+
+    %     if ~istable(all_results) || isempty(all_results)
+    %         % Not a table or empty table
+    %         warning(sprintf('%s table not found',program_list(i)))
+    %         continue;
+    %     end
+
+    %     % Rename configurations in all_results
+    %     all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
+    %     all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
+    %     all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
 
 
+    %     %% ============================================================
+    %     % 1. True Positive Rate vs Angle
+    %     % =============================================================
+
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours, ...
+    %         "Angle", ...
+    %         struct("EM_Config","all","Surface","all"));
 
 
-%% ============================================================
-% 1. True Positive Rate vs Angle
-% =============================================================
+    %     %% ============================================================
+    %     % 2. True Positive Rate vs EM Configuration
+    %     % =============================================================
 
-plot_TPR_comparison( ...
-    all_results, ...
-    configs, ...
-    barColours, ...
-    "Angle", ...
-    struct("EM_Config","all","Surface","all"));
-
-
-%% ============================================================
-% 2. True Positive Rate vs EM Configuration
-% =============================================================
-
-plot_TPR_comparison( ...
-    all_results, ...
-    configs, ...
-    barColours(5:end,:), ...
-    "EM_Config", ...
-    struct("Angle","all","Surface","all"));
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(5:end,:), ...
+    %         "EM_Config", ...
+    %         struct("Angle","all","Surface","all"));
 
 
-%% ============================================================
-% 3. True Positive Rate vs Surface
-% =============================================================
+    %     %% ============================================================
+    %     % 3. True Positive Rate vs Surface
+    %     % =============================================================
 
-plot_TPR_comparison( ...
-    all_results, ...
-    configs, ...
-    barColours(7:end,:), ...
-    "Surface", ...
-    struct("Angle","all","EM_Config","all"));
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(7:end,:), ...
+    %         "Surface", ...
+    %         struct("Angle","all","EM_Config","all"));
 
 
-%% ============================================================
-% 4. Full comparison: Configuration only
-% =============================================================
+    %     %% ============================================================
+    %     % 4. Full comparison: Configuration only
+    %     % =============================================================
 
-plot_TPR_configuration( ...
-    all_results, ...
-    configs, ...
-    barColours(10:end,:));
+    %     plot_TPR_configuration( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(10:end,:));
 
-%% ============================================================
-% Save all figures as .fig and .svg
-% ============================================================
+    %     %% ============================================================
+    %     % Save all figures as .fig and .svg
+    %     % ============================================================
 
-outDir = uigetdir(pwd, 'Select folder to save figures');
+    %     outDir_i = fullfile(outDir, program_list(i));
 
-if outDir ~= 0
+    %     save_figures(outDir_i);
+    %     close all;
+
+
+    % end
+
+    plot_TPR_programs(every_result,program_list,barColours(5:end,:));
+    plot_TPR_vs_X(every_result, program_list, barColours,'LoopTime_ms');
+    plot_TPR_vs_X(every_result, program_list, barColours,'FalsePositiveRate');
+    
+    save_figures(outDir);
+end
+
+function save_figures(outDir_i)
+
+    if ~exist(outDir_i, 'dir')
+        mkdir(outDir_i);
+    end
+
 
     figs = findall(0, 'Type', 'figure');
 
@@ -99,15 +134,47 @@ if outDir ~= 0
         set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 0.85 1]);
 
         % Use your saveFigure function
-        print(fig, fullfile(outDir, filename + ".svg"), "-dsvg");
+        print(fig, fullfile(outDir_i, filename + ".svg"), "-dsvg");
 
     end
 
     disp('All figures saved successfully.')
+end
 
-else
-    disp('Figure saving cancelled.')
+function [all_results, program_list] = load_results_table(rootDir)
+% Loads all results CSV files in a specified order
 
+    program_list = ["SOCP", "SOCPZML", "QP32", "QP16", "QP8", "QP4", "QP8ZML", "ZML"];
+
+    all_results = cell(numel(program_list),1);
+
+    for i = 1:numel(program_list)
+        filename = fullfile(rootDir, program_list(i) + "_Motion.csv");
+
+        if isfile(filename)
+
+            opts = detectImportOptions(filename);
+
+            % Set the first four columns to strings
+            opts = setvartype(opts, ...
+                {'Configuration','Angle','EM_Config','Surface'}, ...
+                'string');
+
+            % Set the remaining columns to doubles
+            opts = setvartype(opts, ...
+                {'TruePositiveRate','DetachmentCount','TruePositiveCount', ...
+                 'WrenchMargin','WrenchMarginStd','TimeAttached', ...
+                 'FalsePositiveRate','LoopTime_ms', ...
+                 'FzPercent','TipPercent','FricPercent'}, ...
+                'double');
+
+            all_results{i} = readtable(filename, opts);
+
+        else
+            warning("Missing file: %s", filename);
+            all_results{i} = table();
+        end
+    end
 end
 
 %% ============================================================
@@ -330,9 +397,9 @@ barTotal = sum(Y,2);
 
 % Original percentages
 splitPct = [ ...
-    T.mean_FzPercent, ...
-    T.mean_TipPercent, ...
-    T.mean_FricPercent];
+    T.mean_TruePositiveRate.*T.mean_FzPercent/100, ...
+    T.mean_TruePositiveRate.*T.mean_TipPercent/100, ...
+    T.mean_TruePositiveRate.*T.mean_FricPercent/100];
 
 for k = 1:height(T)
 
@@ -417,6 +484,307 @@ grid on
 ax = gca;
 ax.FontSize = fontSize;
 ax.FontName = fontName;
+hold off
+
+end
+
+
+function plot_TPR_programs(every_results, program_list, barColours)
+
+% ===========================
+% Plot settings
+% ===========================
+
+fontSize = 20;
+fontName = 'Times New Roman';
+
+
+% ===========================
+% Extract data
+% ===========================
+
+Y = zeros(numel(every_results),3);
+TPR = zeros(numel(every_results),1);
+splitPct = zeros(numel(every_results),3);
+
+
+for i = 1:numel(every_results)
+
+    all_results = every_results{i};
+
+    % Skip missing data
+    if ~istable(all_results) || isempty(all_results)
+        continue
+    end
+
+    % Select all configurations, average over angles
+    t = all_results( ...
+        strcmp(all_results.Surface,"all") & ...
+        strcmp(all_results.EM_Config,"all") & ...
+        ~strcmp(all_results.Angle,"all"), :);
+
+
+    if isempty(t)
+        continue
+    end
+
+
+    % Average values
+    T = groupsummary(t, ...
+        {}, ...
+        'mean', ...
+        {'TruePositiveRate','FzPercent','TipPercent','FricPercent'});
+
+
+    % Store values
+    TPR(i) = T.mean_TruePositiveRate;
+
+    splitPct(i,:) = [
+        T.mean_TruePositiveRate * T.mean_FzPercent/100, ...
+        T.mean_TruePositiveRate * T.mean_TipPercent/100, ...
+        T.mean_TruePositiveRate * T.mean_FricPercent/100
+    ];
+
+
+    % Convert percentage split into stacked heights
+    Y(i,:) = [
+        T.mean_TruePositiveRate * T.mean_FzPercent  / 100, ...
+        T.mean_TruePositiveRate * T.mean_TipPercent / 100, ...
+        T.mean_TruePositiveRate * T.mean_FricPercent/ 100
+    ];
+
+end
+
+
+% ===========================
+% Plot
+% ===========================
+
+figure
+
+program_categories = categorical(program_list, program_list, 'Ordinal', true);
+
+b = bar(program_categories, Y, ...
+    'stacked', ...
+    'BarWidth',0.8);
+
+hold on
+
+
+% Colours
+b(1).FaceColor = barColours(1,:);
+b(2).FaceColor = barColours(2,:);
+b(3).FaceColor = barColours(3,:);
+
+
+legend({'Fz','Tipping','Slip'}, ...
+    'Location','northeast');
+
+
+ylabel('True Positive Rate (%)')
+
+
+% ===========================
+% Add labels
+% ===========================
+
+for k = 1:size(Y,1)
+
+    if sum(Y(k,:)) == 0
+        continue
+    end
+
+    x = b(1).XEndPoints(k);
+
+    yBottom = 0;
+
+    for s = 1:3
+
+        h = Y(k,s);
+
+        if h > 0
+            text(x,...
+                yBottom+h/2,...
+                sprintf('%.0f%%',splitPct(k,s)),...
+                'HorizontalAlignment','center',...
+                'VerticalAlignment','middle',...
+                'FontSize',fontSize-1,...
+                'FontName',fontName);
+        end
+
+        yBottom = yBottom+h;
+
+    end
+
+
+    text(x,...
+        sum(Y(k,:))+2.5,...
+        sprintf('%.1f%%',TPR(k)),...
+        'HorizontalAlignment','center',...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+end
+
+
+% ===========================
+% Formatting
+% ===========================
+
+ylim([0 105])
+
+xlabel('Controller',...
+       'FontSize',fontSize*1.5,...
+       'FontName',fontName,...
+       'FontWeight','bold')
+
+ylabel('True Positive Rate (%)',...
+       'FontSize',fontSize*1.5,...
+       'FontName',fontName,...
+       'FontWeight','bold')
+
+
+grid on
+
+ax = gca;
+ax.FontSize = fontSize;
+ax.FontName = fontName;
+
+hold off
+
+end
+
+function plot_TPR_vs_X(every_results, program_list, markerColours, xVariable)
+
+% ===========================
+% Plot settings
+% ===========================
+
+fontSize = 20;
+fontName = 'Times New Roman';
+
+
+% ===========================
+% Extract data
+% ===========================
+
+TPR = zeros(numel(every_results),1);
+X = zeros(numel(every_results),1);
+
+
+for i = 1:numel(every_results)
+
+    all_results = every_results{i};
+
+    if ~istable(all_results) || isempty(all_results)
+        continue
+    end
+
+
+    % Select all configurations, average over angles
+    t = all_results( ...
+        strcmp(all_results.Surface,"all") & ...
+        strcmp(all_results.EM_Config,"all") & ...
+        ~strcmp(all_results.Angle,"all"), :);
+
+
+    if isempty(t)
+        continue
+    end
+
+
+    % Average values
+    T = groupsummary(t, ...
+        {}, ...
+        'mean', ...
+        {'TruePositiveRate','LoopTime_ms','FalsePositiveRate'});
+
+
+    % Store values
+    TPR(i) = T.mean_TruePositiveRate;
+
+
+    switch xVariable
+
+        case 'LoopTime_ms'
+            X(i) = T.mean_LoopTime_ms;
+
+        case 'FalsePositiveRate'
+            X(i) = T.mean_FalsePositiveRate;
+
+        otherwise
+            error('Unknown xVariable. Use ''LoopTime_ms'' or ''FalsePositiveRate''.')
+
+    end
+
+end
+
+
+% ===========================
+% Plot
+% ===========================
+
+figure
+
+n = length(program_list);
+markerColours = markerColours(1:n,:);
+
+scatter(X, TPR, 120, markerColours, 'filled');
+
+hold on
+
+
+% Labels
+for i = 1:length(program_list)
+
+    if X(i) == 0
+        continue
+    end
+
+    text(X(i), ...
+         TPR(i)+1, ...
+         program_list{i}, ...
+         'FontSize',fontSize-2,...
+         'FontName',fontName);
+
+end
+
+
+% ===========================
+% Formatting
+% ===========================
+
+switch xVariable
+
+    case 'LoopTime_ms'
+        xlabel('Loop Time (ms)',...
+               'FontSize',fontSize*1.5,...
+               'FontName',fontName,...
+               'FontWeight','bold');
+
+    case 'FalsePositiveRate'
+        xlabel('False Positive Rate (%)',...
+               'FontSize',fontSize*1.5,...
+               'FontName',fontName,...
+               'FontWeight','bold');
+
+end
+
+
+ylabel('True Positive Rate (%)',...
+       'FontSize',fontSize*1.5,...
+       'FontName',fontName,...
+       'FontWeight','bold');
+
+
+ylim([0 105])
+
+grid on
+
+ax = gca;
+ax.FontSize = fontSize;
+ax.FontName = fontName;
+
 hold off
 
 end
