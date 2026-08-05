@@ -1,3 +1,4 @@
 **.asv
 Force_Sensor_Data/viewer.html
-Force_Sensor_Data/*_2026_*/data.csv
+Force_Sensor_Data/*_2026_*/
+Force_Sensor_Data/*/*_2026_*/
