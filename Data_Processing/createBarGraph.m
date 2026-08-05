@@ -35,82 +35,112 @@ function createBarGraph(rootDir,outDir)
         0.6784 0.5765 0.7608   % #ad93c2 (muted purple)
     ];
 
-    for i = 1:length(every_result)
-        all_results = every_result{i};
+    % for i = 1:length(every_result)
+    %     all_results = every_result{i};
 
-        if ~istable(all_results) || isempty(all_results)
-            % Not a table or empty table
-            warning(sprintf('%s table not found',program_list(i)))
-            continue;
-        end
+    %     if ~istable(all_results) || isempty(all_results)
+    %         % Not a table or empty table
+    %         warning(sprintf('%s table not found',program_list(i)))
+    %         continue;
+    %     end
 
-        % Rename configurations in all_results
-        all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
-        all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
-        all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
-
-
-        %% ============================================================
-        % 1. True Positive Rate vs Angle
-        % =============================================================
-
-        plot_TPR_comparison( ...
-            all_results, ...
-            configs, ...
-            barColours, ...
-            "Angle", ...
-            struct("EM_Config","all","Surface","all"));
+    %     % Rename configurations in all_results
+    %     all_results.Configuration(ismember(all_results.Configuration,"single")) = configs(1);
+    %     all_results.Configuration(ismember(all_results.Configuration,"flat"))   = configs(2);
+    %     all_results.Configuration(ismember(all_results.Configuration,"RA"))     = configs(3);
 
 
-        %% ============================================================
-        % 2. True Positive Rate vs EM Configuration
-        % =============================================================
+    %     %% ============================================================
+    %     % 1. True Positive Rate vs Angle
+    %     % =============================================================
 
-        plot_TPR_comparison( ...
-            all_results, ...
-            configs, ...
-            barColours(5:end,:), ...
-            "EM_Config", ...
-            struct("Angle","all","Surface","all"));
-
-
-        %% ============================================================
-        % 3. True Positive Rate vs Surface
-        % =============================================================
-
-        plot_TPR_comparison( ...
-            all_results, ...
-            configs, ...
-            barColours(7:end,:), ...
-            "Surface", ...
-            struct("Angle","all","EM_Config","all"));
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours, ...
+    %         "Angle", ...
+    %         struct("EM_Config","all","Surface","all"));
 
 
-        %% ============================================================
-        % 4. Full comparison: Configuration only
-        % =============================================================
+    %     %% ============================================================
+    %     % 2. True Positive Rate vs EM Configuration
+    %     % =============================================================
 
-        plot_TPR_configuration( ...
-            all_results, ...
-            configs, ...
-            barColours(10:end,:));
-
-        %% ============================================================
-        % Save all figures as .fig and .svg
-        % ============================================================
-
-        outDir_i = fullfile(outDir, program_list(i));
-
-        save_figures(outDir_i);
-        close all;
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(5:end,:), ...
+    %         "EM_Config", ...
+    %         struct("Angle","all","Surface","all"));
 
 
-    end
+    %     %% ============================================================
+    %     % 3. True Positive Rate vs Surface
+    %     % =============================================================
+
+    %     plot_TPR_comparison( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(7:end,:), ...
+    %         "Surface", ...
+    %         struct("Angle","all","EM_Config","all"));
+
+
+    %     %% ============================================================
+    %     % 4. Full comparison: Configuration only
+    %     % =============================================================
+
+    %     plot_TPR_configuration( ...
+    %         all_results, ...
+    %         configs, ...
+    %         barColours(10:end,:));
+
+    %     %% ============================================================
+    %     % Save all figures as .fig and .svg
+    %     % ============================================================
+
+    %     outDir_i = fullfile(outDir, program_list(i));
+
+    %     save_figures(outDir_i);
+    %     close all;
+
+
+    % end
 
     plot_TPR_programs(every_result,program_list,barColours(5:end,:));
     plot_TPR_vs_X(every_result, program_list, barColours,'LoopTime_ms');
     plot_TPR_vs_X(every_result, program_list, barColours,'FalsePositiveRate');
-    
+
+    %% Plot stacked bars for each series
+
+    plotTPRStackedBars( ...
+        every_result, ...
+        program_list, ...
+        "Configuration", ...
+        barColours);
+
+
+    plotTPRStackedBars( ...
+        every_result, ...
+        program_list, ...
+        "Angle", ...
+        barColours);
+
+
+    plotTPRStackedBars( ...
+        every_result, ...
+        program_list, ...
+        "EM_Config", ...
+        barColours);
+
+
+    plotTPRStackedBars( ...
+        every_result, ...
+        program_list, ...
+        "Surface", ...
+        barColours);
+
+
     save_figures(outDir);
 
     create_summary_csv(every_result, program_list, outDir);
@@ -769,6 +799,8 @@ switch xVariable
                'FontSize',fontSize*1.5,...
                'FontName',fontName,...
                'FontWeight','bold');
+        axis equal
+        xlim([0 105])
 
 end
 
@@ -790,6 +822,197 @@ ax.FontName = fontName;
 hold off
 
 end
+
+function plotTPRStackedBars(every_result, program_list, seriesName, barColours)
+
+    %% Plot settings (change here)
+    fontSize = 20;
+    fontName = 'Times New Roman';
+
+    %% Validate inputs
+    if length(every_result) ~= length(program_list)
+        error('every_result and program_list must have the same length');
+    end
+
+    validSeries = ["Configuration","Angle","EM_Config","Surface"];
+
+    if ~ismember(seriesName, validSeries)
+        error('seriesName must be Configuration, Angle, EM_Config, or Surface');
+    end
+
+    %% Map series name to table variable
+    seriesVar = char(seriesName);
+
+    %% Storage
+    nPrograms = length(program_list);
+
+    stackData = cell(nPrograms,1);
+    stackLabels = cell(nPrograms,1);
+    falsePositiveRates = zeros(nPrograms,1);
+
+    %% Extract data
+    for i = 1:nPrograms
+
+        T = every_result{i};
+
+        % Find compiled "all" row
+        allMask = strcmp(T.Configuration,'all') & ...
+                  strcmp(T.Angle,'all') & ...
+                  strcmp(T.EM_Config,'all') & ...
+                  strcmp(T.Surface,'all');
+
+        if ~any(allMask)
+            error('No compiled all/all/all/all row found for %s', program_list{i});
+        end
+
+        totalTP = T.TruePositiveCount(allMask);
+
+        totalTPR = T.TruePositiveRate(allMask);
+
+        falsePositiveRates(i) = T.FalsePositiveRate(allMask);
+
+
+        %% Filter dimensions not being plotted to "all"
+
+        filterMask = true(height(T),1);
+
+        otherSeries = setdiff(validSeries, seriesName);
+
+        for j = 1:length(otherSeries)
+            filterMask = filterMask & strcmp(T.(otherSeries(j)),'all');
+        end
+
+
+        %% Extract series rows
+        Ts = T(filterMask,:);
+
+        % Remove possible duplicate "all" row
+        Ts(strcmp(Ts.(seriesVar),'all'),:) = [];
+
+
+        %% Calculate stack percentages
+
+        values = (Ts.TruePositiveCount ./ totalTP).*totalTPR;
+
+        stackData{i} = values;
+
+        stackLabels{i} = string(Ts.(seriesVar));
+
+    end
+
+
+    %% Make common categories across all programs
+
+    allCategories = unique(vertcat(stackLabels{:}), 'stable');
+
+    nCategories = length(allCategories);
+
+    Y = zeros(nPrograms,nCategories);
+
+
+    for i = 1:nPrograms
+
+        for j = 1:length(stackLabels{i})
+
+            idx = find(allCategories == stackLabels{i}(j));
+
+            Y(i,idx) = stackData{i}(j);
+
+        end
+
+    end
+
+
+    %% Plot
+
+    figure;
+    hold on;
+
+    b = bar(Y,'stacked','LineWidth',1);
+
+    for i = 1:min(length(b),size(barColours,1))
+        b(i).FaceColor = barColours(i,:);
+    end
+
+
+    %% Add percentage labels inside stacks
+
+    for i = 1:nPrograms
+
+        cumulative = 0;
+
+        for j = 1:nCategories
+
+            value = Y(i,j);
+
+            if value > 0
+
+                yPos = cumulative + value/2;
+
+                text(i, yPos, sprintf('%.1f%%',value), ...
+                    'HorizontalAlignment','center',...
+                    'VerticalAlignment','middle',...
+                    'FontSize',fontSize,...
+                    'FontName',fontName);
+
+            end
+
+            cumulative = cumulative + value;
+
+        end
+
+    end
+
+
+    %% Add false positive rate labels above bars
+
+    maxHeight = max(sum(Y,2));
+
+    for i = 1:nPrograms
+
+        text(i, sum(Y(i,:))+2, ...
+            sprintf('FP %.1f%%',falsePositiveRates(i)), ...
+            'HorizontalAlignment','center',...
+            'VerticalAlignment','bottom',...
+            'FontSize',fontSize,...
+            'FontName',fontName);
+
+    end
+
+
+    %% Axes formatting
+
+    ylabel('True Positive Rate (%)',...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+    xlabel('Program',...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+
+    xticks(1:nPrograms);
+    xticklabels(program_list);
+
+    ylim([0 105]);
+
+    set(gca,...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+    legend(allCategories,...
+        'Location','eastoutside',...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+
+    grid on;
+    box on;
+
+    hold off;
+
+end
+
 
 function create_summary_csv(every_result, program_list, outDir)
 

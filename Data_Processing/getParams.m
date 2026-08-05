@@ -57,17 +57,18 @@ function parameters = getParams(config,angle,emconfig,surface)
     m_RA_Plate = 0.272;
 
     Gg = zeros(6,6);
+    g_base = [0.0,0.0,-9.81];
 
     c = 1.0;
     p_magnet = 450;
-    em_magnet = 290;
+    em_magnet = 280;
 
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
-        mag_s = 0.15;
+        mag_s = 0.1;
         parameters.r_x = parameters.r_x/2;
     elseif ismember(surface, {'shelf'})
-        mag_s = 0.05;
+        mag_s = 0.052;
     end
 
     if ismember(config, {'flat','RA'})
@@ -169,8 +170,8 @@ function parameters = getParams(config,angle,emconfig,surface)
         parameters.trans{1} = trans;
 
         trans = [-165.2400; 138.6500; -246.4600]*0.001;
-        rot = [0.6428  0.0000  -0.7660;
-            0.7660  0.0000  0.6428;
+        rot = [-0.6428  0.0000  -0.7660;
+            -0.7660  0.0000  0.6428;
             0.0000  -1.0000  0.0000];
 
         parameters.G{2} = getGMatrix(trans, rot);
@@ -186,10 +187,11 @@ function parameters = getParams(config,angle,emconfig,surface)
 
         if strcmp(angle,'180')
             angle = '90V';
+        elseif strcmp(angle,'90')
+            g_base = g_base.*-1; 
         end
     end
     
-    g_base = [0.0,0.0,-9.81];
         
 
     if strcmp(angle,'0')
