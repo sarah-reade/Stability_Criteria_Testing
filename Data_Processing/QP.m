@@ -89,7 +89,7 @@ function [x,gamma_cnstr] = solveQP(parameters,wrench,nSides)
             A(row,fx) = c;
             A(row,fy) = s;
             A(row,fz) = -mu;
-            A(row,end) = mu;
+            A(row,end) = 1;
 
             b(row) = mu*Fa(i);
 
@@ -100,14 +100,14 @@ function [x,gamma_cnstr] = solveQP(parameters,wrench,nSides)
         % +mz
         A(row,mz) = 1/reff;
         A(row,fz) = -mu;
-        A(row,end) = mu;
+        A(row,end) = 1;
         b(row) = mu*Fa(i);
         row = row+1;
 
         % -mz
         A(row,mz) = -1/reff;
         A(row,fz) = -mu;
-        A(row,end) = mu;
+        A(row,end) = 1;
         b(row) = mu*Fa(i);
         row = row+1;
 

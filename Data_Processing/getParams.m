@@ -61,14 +61,14 @@ function parameters = getParams(config,angle,emconfig,surface)
 
     c = 1.0;
     p_magnet = 450;
-    em_magnet = 280;
+    em_magnet = 290;
 
     mag_s = 0.0;
     if ismember(surface, {'steelbeam'})
         mag_s = 0.1;
         parameters.r_x = parameters.r_x/2;
     elseif ismember(surface, {'shelf'})
-        mag_s = 0.052;
+        mag_s = 0.05;
     end
 
     if ismember(config, {'flat','RA'})

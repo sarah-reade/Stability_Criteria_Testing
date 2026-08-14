@@ -107,38 +107,39 @@ function createBarGraph(rootDir,outDir)
 
     % end
 
-    plot_TPR_programs(every_result,program_list,barColours(5:end,:));
-    plot_TPR_vs_X(every_result, program_list, barColours,'LoopTime_ms');
-    plot_TPR_vs_X(every_result, program_list, barColours,'FalsePositiveRate');
-
+    plot_TPR_programs(every_result,program_list,barColours);
+    plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'LoopTime_ms');
+    plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'FalsePositiveRate');
+    plotLoopTimeByConfiguration(every_result, program_list, barColours(10:end,:));
+    plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
     %% Plot stacked bars for each series
 
-    plotTPRStackedBars( ...
-        every_result, ...
-        program_list, ...
-        "Configuration", ...
-        barColours);
+    % plotTPRStackedBars( ...
+    %     every_result, ...
+    %     program_list, ...
+    %     "Configuration", ...
+    %     barColours(10:end,:));
 
 
-    plotTPRStackedBars( ...
-        every_result, ...
-        program_list, ...
-        "Angle", ...
-        barColours);
+    % plotTPRStackedBars( ...
+    %     every_result, ...
+    %     program_list, ...
+    %     "Angle", ...
+    %     barColours);
 
 
-    plotTPRStackedBars( ...
-        every_result, ...
-        program_list, ...
-        "EM_Config", ...
-        barColours);
+    % plotTPRStackedBars( ...
+    %     every_result, ...
+    %     program_list, ...
+    %     "EM_Config", ...
+    %     barColours(5:end,:));
 
 
-    plotTPRStackedBars( ...
-        every_result, ...
-        program_list, ...
-        "Surface", ...
-        barColours);
+    % plotTPRStackedBars( ...
+    %     every_result, ...
+    %     program_list, ...
+    %     "Surface", ...
+    %     barColours(7:end,:));
 
 
     save_figures(outDir);
@@ -715,9 +716,12 @@ for i = 1:numel(every_result)
 
     % Select all configurations, average over angles
     t = all_results( ...
+        strcmp(all_results.Configuration,"all") & ...
         strcmp(all_results.Surface,"all") & ...
         strcmp(all_results.EM_Config,"all") & ...
-        ~strcmp(all_results.Angle,"all"), :);
+        strcmp(all_results.Angle,"all"), :);
+
+    
 
 
     if isempty(t)
@@ -740,9 +744,13 @@ for i = 1:numel(every_result)
 
         case 'LoopTime_ms'
             X(i) = T.mean_LoopTime_ms;
+            labelOffset.x = 0.2;
+            labelOffset.y = 2;
 
         case 'FalsePositiveRate'
             X(i) = T.mean_FalsePositiveRate;
+            labelOffset.x = 2;
+            labelOffset.y = 2;
 
         otherwise
             error('Unknown xVariable. Use ''LoopTime_ms'' or ''FalsePositiveRate''.')
@@ -773,11 +781,87 @@ for i = 1:length(program_list)
         continue
     end
 
-    text(X(i), ...
-         TPR(i)+1, ...
-         program_list{i}, ...
-         'FontSize',fontSize-2,...
-         'FontName',fontName);
+    if strcmp(xVariable,'FalsePositiveRate') && contains(program_list{i}, "QP") && ~contains(program_list{i}, "ZML")
+        
+        switch program_list{i}
+
+            case 'QP4'
+                dx = 0.00; dy = -3;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','center', ...
+                    'VerticalAlignment','top', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP8'
+                dx = 3; dy = 0;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','left', ...
+                    'VerticalAlignment','middle', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP16'
+                dx = 0.02; dy = 3;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','left', ...
+                    'VerticalAlignment','bottom', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP32'
+            dx = -3; dy = 0;
+            line([X(i) X(i)+dx], ...
+                [TPR(i) TPR(i)+dy], ...
+                'Color','k');
+            text(X(i)+dx, TPR(i)+dy, program_list{i}, ...
+                'HorizontalAlignment','right', ...
+                'VerticalAlignment','middle', ...
+                'FontSize',fontSize-2, ...
+                'FontName',fontName);
+
+        end
+
+
+        continue
+    end
+
+    if strcmp(xVariable,'LoopTime_ms') && contains(program_list{i}, "QP4")
+        dx = labelOffset.x;
+        dy = 0;
+
+        line([X(i) X(i)+dx], ...
+            [TPR(i) TPR(i)+dy], ...
+            'Color','k');
+
+        text(X(i)+dx, ...
+            TPR(i)+dy, ...
+            program_list{i}, ...
+            'HorizontalAlignment','left', ...
+            'VerticalAlignment','bottom', ...
+            'FontSize',fontSize-2, ...
+            'FontName',fontName);
+        continue
+    end
+
+    dx = labelOffset.x;
+    dy = labelOffset.y;
+
+    line([X(i) X(i)+dx], ...
+        [TPR(i) TPR(i)+dy], ...
+        'Color','k');
+
+    text(X(i)+dx, ...
+        TPR(i)+dy, ...
+        program_list{i}, ...
+        'HorizontalAlignment','left', ...
+        'VerticalAlignment','bottom', ...
+        'FontSize',fontSize-2, ...
+        'FontName',fontName);
+
 
 end
 
@@ -800,7 +884,7 @@ switch xVariable
                'FontName',fontName,...
                'FontWeight','bold');
         axis equal
-        xlim([0 105])
+        xlim([0 50])
 
 end
 
@@ -811,7 +895,7 @@ ylabel('True Positive Rate (%)',...
        'FontWeight','bold');
 
 
-ylim([0 105])
+ylim([0 100])
 
 grid on
 
@@ -848,7 +932,7 @@ function plotTPRStackedBars(every_result, program_list, seriesName, barColours)
 
     stackData = cell(nPrograms,1);
     stackLabels = cell(nPrograms,1);
-    falsePositiveRates = zeros(nPrograms,1);
+    truePositiveRates = zeros(nPrograms,1);
 
     %% Extract data
     for i = 1:nPrograms
@@ -869,7 +953,7 @@ function plotTPRStackedBars(every_result, program_list, seriesName, barColours)
 
         totalTPR = T.TruePositiveRate(allMask);
 
-        falsePositiveRates(i) = T.FalsePositiveRate(allMask);
+        truePositiveRates(i) = T.TruePositiveRate(allMask);
 
 
         %% Filter dimensions not being plotted to "all"
@@ -971,7 +1055,7 @@ function plotTPRStackedBars(every_result, program_list, seriesName, barColours)
     for i = 1:nPrograms
 
         text(i, sum(Y(i,:))+2, ...
-            sprintf('FP %.1f%%',falsePositiveRates(i)), ...
+            sprintf('%.1f%%',truePositiveRates(i)), ...
             'HorizontalAlignment','center',...
             'VerticalAlignment','bottom',...
             'FontSize',fontSize,...
@@ -1000,8 +1084,20 @@ function plotTPRStackedBars(every_result, program_list, seriesName, barColours)
         'FontSize',fontSize,...
         'FontName',fontName);
 
+
+
+    if strcmp(seriesName,'Configuration')
+        configs = [
+            "2 Non-Planar Contacts"
+            "2 Planar Contacts"
+            "1 Contact"
+        ];
+
+        allCategories = configs;
+    end
+
     legend(allCategories,...
-        'Location','eastoutside',...
+        'Location','northwest',...
         'FontSize',fontSize,...
         'FontName',fontName);
 
@@ -1085,5 +1181,196 @@ function create_summary_csv(every_result, program_list, outDir)
     writetable(summary, filename);
 
     fprintf('Summary table saved: %s\n', filename)
+
+end
+
+
+function plotLoopTimeByConfiguration(every_result, program_list, barColours)
+
+    %% Plot settings (change here)
+    fontSize = 20;
+    fontName = 'Times New Roman';
+
+    configs = [
+        "1 Contact"
+        "2 Planar Contacts"
+        "2 Non-Planar Contacts"
+    ];
+
+    configKeys = ["single","flat","RA"];
+
+    %% Storage
+
+    nPrograms = numel(program_list);
+    nConfigs = numel(configKeys);
+
+    Y = nan(nPrograms,nConfigs);
+
+    %% Extract data
+
+    for i = 1:nPrograms
+
+        T = every_result{i};
+
+        % Keep only compiled results
+        mask = strcmp(T.Angle,'all') & ...
+               strcmp(T.EM_Config,'all') & ...
+               strcmp(T.Surface,'all');
+
+        T = T(mask,:);
+
+        % Extract each configuration
+        for j = 1:nConfigs
+
+            idx = strcmp(T.Configuration,configKeys(j));
+
+            if any(idx)
+                Y(i,j) = T.LoopTime_ms(idx);
+            end
+
+        end
+
+    end
+
+    %% Plot
+
+    figure;
+    hold on
+
+    b = bar(Y,'grouped','LineWidth',1);
+
+    for j = 1:nConfigs
+        b(j).FaceColor = barColours(nConfigs-j+1,:);
+    end
+
+
+    %% Formatting
+
+    xlabel('Program', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    ylabel('Loop Time (ms)', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    xticks(1:nPrograms)
+    xticklabels(program_list)
+
+    legend(configs, ...
+        'Location','northeast', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName)
+
+    set(gca,...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+    box on
+    grid on
+    
+    % Set y ticks
+    ax = gca;
+    yticks(0:1:ax.YLim(2))
+    ax.YMinorGrid = 'on';
+    ax.MinorGridLineStyle = '-';
+
+    hold off
+
+end
+
+function plotTruePositiveByConfiguration(every_result, program_list, barColours)
+
+    %% Plot settings (change here)
+    fontSize = 20;
+    fontName = 'Times New Roman';
+
+    configs = [
+        "1 Contact"
+        "2 Planar Contacts"
+        "2 Non-Planar Contacts"
+    ];
+
+    configKeys = ["single","flat","RA"];
+
+    %% Storage
+
+    nPrograms = numel(program_list);
+    nConfigs = numel(configKeys);
+
+    Y = nan(nPrograms,nConfigs);
+
+    %% Extract data
+
+    for i = 1:nPrograms
+
+        T = every_result{i};
+
+        % Keep only compiled results
+        mask = strcmp(T.Angle,'all') & ...
+               strcmp(T.EM_Config,'all') & ...
+               strcmp(T.Surface,'all');
+
+        T = T(mask,:);
+
+        % Extract each configuration
+        for j = 1:nConfigs
+
+            idx = strcmp(T.Configuration,configKeys(j));
+
+            if any(idx)
+                Y(i,j) = T.TruePositiveRate(idx);
+            end
+
+        end
+
+    end
+
+    %% Plot
+
+    figure;
+    hold on
+
+    b = bar(Y,'grouped','LineWidth',1);
+
+    for j = 1:nConfigs
+        b(j).FaceColor = barColours(nConfigs-j+1,:);
+    end
+
+
+    %% Formatting
+
+    xlabel('Program', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    ylabel('True Positive Rate (%)', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    xticks(1:nPrograms)
+    xticklabels(program_list)
+
+    legend(configs, ...
+        'Location','north', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName)
+
+    set(gca,...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+    box on
+    grid on
+    
+    % Set y ticks
+    ax = gca;
+
+    ylim([0 104])
+    yticks(0:5:ax.YLim(2))
+    ax.YMinorGrid = 'on';
+    ax.MinorGridLineStyle = '-';
+
+    hold off
 
 end

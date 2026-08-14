@@ -92,17 +92,17 @@ function [x,beta] = solveSOCP(parameters, wrench)
 
         startCol = 6*(i-1) + 1;
 
-        Asoc(1, startCol)     = 1;
-        Asoc(2, startCol + 1) = 1;
-        Asoc(3, startCol + 5) = 1/reff;
+        Asoc(1, startCol)     = 1/mu;
+        Asoc(2, startCol + 1) = 1/mu;
+        Asoc(3, startCol + 5) = 1/(reff*mu);
 
         bsoc = zeros(3,1);
 
         dsoc = zeros(ncol, 1);
-        dsoc(startCol + 2,1) = mu;
+        dsoc(startCol + 2,1) = 1;
         dsoc(end,1) = -1;
 
-        gamma = -mu*Fa(i);
+        gamma = -1*Fa(i);
         
         socConstraints(nc+1-i) = secondordercone(Asoc,bsoc,dsoc,gamma);
 
