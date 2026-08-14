@@ -28,6 +28,8 @@ function [variables,gamma_cnstr,beta,all_beta,loopTime] = obtainAdhesionCriteria
             [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,16);
         case 'QP32'
             [variables,gamma_cnstr,beta,all_beta,loopTime] = QP(parameters,wrench,32);
+        case 'QP3D'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = QP3D(parameters,wrench,4);
         case 'SOCPZML'
             [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCPZML(parameters,wrench);
         case 'QP8ZML'

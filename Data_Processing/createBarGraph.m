@@ -107,11 +107,11 @@ function createBarGraph(rootDir,outDir)
 
     % end
 
-    plot_TPR_programs(every_result,program_list,barColours);
-    plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'LoopTime_ms');
-    plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'FalsePositiveRate');
-    plotLoopTimeByConfiguration(every_result, program_list, barColours(10:end,:));
-    plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
+    % plot_TPR_programs(every_result,program_list,barColours);
+    % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'LoopTime_ms');
+    % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'FalsePositiveRate');
+    % plotLoopTimeByConfiguration(every_result, program_list, barColours(10:end,:));
+    % plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
     %% Plot stacked bars for each series
 
     % plotTPRStackedBars( ...
@@ -142,7 +142,7 @@ function createBarGraph(rootDir,outDir)
     %     barColours(7:end,:));
 
 
-    save_figures(outDir);
+    % save_figures(outDir);
 
     create_summary_csv(every_result, program_list, outDir);
 end
@@ -877,6 +877,7 @@ switch xVariable
                'FontSize',fontSize*1.5,...
                'FontName',fontName,...
                'FontWeight','bold');
+        ylim([0 100])
 
     case 'FalsePositiveRate'
         xlabel('False Positive Rate (%)',...
@@ -885,6 +886,7 @@ switch xVariable
                'FontWeight','bold');
         axis equal
         xlim([0 50])
+        ylim([40 100])
 
 end
 
@@ -895,7 +897,6 @@ ylabel('True Positive Rate (%)',...
        'FontWeight','bold');
 
 
-ylim([0 100])
 
 grid on
 
@@ -1144,10 +1145,12 @@ function create_summary_csv(every_result, program_list, outDir)
 
         % Same filtering as your plots
         t = all_results( ...
+            strcmp(all_results.Configuration,"all") & ...
             strcmp(all_results.Surface,"all") & ...
             strcmp(all_results.EM_Config,"all") & ...
-            ~strcmp(all_results.Angle,"all"), :);
+            strcmp(all_results.Angle,"all"), :);
 
+        
 
         if isempty(t)
             summary.TruePositiveRate(i) = NaN;
@@ -1271,7 +1274,7 @@ function plotLoopTimeByConfiguration(every_result, program_list, barColours)
     
     % Set y ticks
     ax = gca;
-    yticks(0:1:ax.YLim(2))
+    yticks(0:2:ax.YLim(2))
     ax.YMinorGrid = 'on';
     ax.MinorGridLineStyle = '-';
 
@@ -1367,7 +1370,7 @@ function plotTruePositiveByConfiguration(every_result, program_list, barColours)
     ax = gca;
 
     ylim([0 104])
-    yticks(0:5:ax.YLim(2))
+    yticks(0:20:ax.YLim(2))
     ax.YMinorGrid = 'on';
     ax.MinorGridLineStyle = '-';
 
