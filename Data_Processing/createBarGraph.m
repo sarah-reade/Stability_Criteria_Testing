@@ -111,7 +111,8 @@ function createBarGraph(rootDir,outDir)
     % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'LoopTime_ms');
     % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'FalsePositiveRate');
     % plotLoopTimeByConfiguration(every_result, program_list, barColours(10:end,:));
-    % plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
+    plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
+    % plotTruePositiveByAngle(every_result, program_list, barColours(6:9,:));
     %% Plot stacked bars for each series
 
     % plotTPRStackedBars( ...
@@ -144,7 +145,7 @@ function createBarGraph(rootDir,outDir)
 
     % save_figures(outDir);
 
-    create_summary_csv(every_result, program_list, outDir);
+    % create_summary_csv(every_result, program_list, outDir);
 end
 
 function save_figures(outDir_i)
@@ -165,6 +166,7 @@ function save_figures(outDir_i)
         
         % Set size
         set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 0.85 1]);
+        set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
 
         % Use your saveFigure function
         print(fig, fullfile(outDir_i, filename + ".svg"), "-dsvg");
@@ -786,11 +788,11 @@ for i = 1:length(program_list)
         switch program_list{i}
 
             case 'QP4'
-                dx = 0.00; dy = -3;
+                dx = -3.00; dy = 0;
                 line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
                 text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
-                    'HorizontalAlignment','center', ...
-                    'VerticalAlignment','top', ...
+                    'HorizontalAlignment','right', ...
+                    'VerticalAlignment','middle', ...
                     'FontSize',fontSize-2, ...
                     'FontName',fontName);
 
@@ -886,7 +888,7 @@ switch xVariable
                'FontWeight','bold');
         axis equal
         xlim([0 50])
-        ylim([40 100])
+        ylim([30 100])
 
 end
 
@@ -1356,6 +1358,99 @@ function plotTruePositiveByConfiguration(every_result, program_list, barColours)
 
     legend(configs, ...
         'Location','north', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName)
+
+    set(gca,...
+        'FontSize',fontSize,...
+        'FontName',fontName);
+
+    box on
+    grid on
+    
+    % Set y ticks
+    ax = gca;
+
+    ylim([0 104])
+    yticks(0:20:ax.YLim(2))
+    ax.YMinorGrid = 'on';
+    ax.MinorGridLineStyle = '-';
+
+    hold off
+
+end
+
+
+function plotTruePositiveByAngle(every_result, program_list, barColours)
+
+    %% Plot settings (change here)
+    fontSize = 20;
+    fontName = 'Times New Roman';
+
+    configs = ["0","90","90V","180"];
+
+    configKeys = ["0","90","90V","180"];
+
+    %% Storage
+
+    nPrograms = numel(program_list);
+    nConfigs = numel(configKeys);
+
+    Y = nan(nPrograms,nConfigs);
+
+    %% Extract data
+
+    for i = 1:nPrograms
+
+        T = every_result{i};
+
+        % Keep only compiled results
+        mask = strcmp(T.Configuration,'all') & ...
+               strcmp(T.EM_Config,'all') & ...
+               strcmp(T.Surface,'all');
+
+        T = T(mask,:);
+
+        % Extract each configuration
+        for j = 1:nConfigs
+
+            idx = strcmp(T.Angle,configKeys(j));
+
+            if any(idx)
+                Y(i,j) = T.TruePositiveRate(idx);
+            end
+
+        end
+
+    end
+
+    %% Plot
+
+    figure;
+    hold on
+
+    b = bar(Y,'grouped','LineWidth',1);
+
+    for j = 1:nConfigs
+        b(j).FaceColor = barColours(nConfigs-j+1,:);
+    end
+
+
+    %% Formatting
+
+    xlabel('Program', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    ylabel('True Positive Rate (%)', ...
+        'FontSize',fontSize, ...
+        'FontName',fontName);
+
+    xticks(1:nPrograms)
+    xticklabels(program_list)
+
+    legend(configs, ...
+        'Location','northeast', ...
         'FontSize',fontSize, ...
         'FontName',fontName)
 

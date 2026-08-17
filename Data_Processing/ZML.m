@@ -13,7 +13,12 @@ function [gamma,all_beta,loopTime] = ZML(parameters,wrench)
 
     % Get support polyhedron relative to force sensor
     support_polyhedron = cachedSupportPolyhedron;
-    
+    Fa   = parameters.s.*parameters.Fd;
+    nc = numel(parameters.c);
+    for i = 1:nc
+        wrench = wrench + parameters.G{i}*[0; 0; Fa(i); 0; 0; 0];
+    end
+
     % if 2D 
     if support_polyhedron.planar
         % Calculate ZMP

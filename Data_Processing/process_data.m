@@ -12,7 +12,7 @@ dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
 dataReg = getDataReg(dataRegPath);
 
 calculationMethods = {'SOCP', 'QP4', 'QP8', 'QP16', 'QP32','QP3D','ZML', 'SOCPZML', 'QP8ZML'};
-
+calculationMethods = {'ZML', 'SOCPZML', 'QP8ZML'};
 
 if runSelection
     [processDataParams,selectedIdxs] = runSelectionUi(dataReg,calculationMethods);
