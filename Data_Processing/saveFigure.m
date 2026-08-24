@@ -7,7 +7,7 @@ function saveFigure(fig, outDir, filename, fscsvFilename, imucsvFilename)
     end
 
     % Maximise the figure so the exported image matches the on-screen view.
-    set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
+    set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 0.9 1]);
 
     savefig(fig, fullfile(outDir, filename + ".fig"));
     print(fig, fullfile(outDir, filename + ".svg"), "-dsvg");

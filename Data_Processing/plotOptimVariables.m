@@ -3,11 +3,11 @@ function [fig,axs] = plotOptimVariables(time, variables, nc, beta, negTimeSegmen
     %PLOTOPTIMVARIABLES Plot the reconstructed contact variables and beta terms.
     axs = [];
     % Extract the envelope used for the final constraint plot.
-    beta_copy = beta;
-    gamma = min(min(beta_copy, [], 2), [], 3);
+    % beta_copy = beta;
+    % gamma = min(min(beta_copy, [], 2), [], 3);
 
     fig = figure('Color', 'w', 'Name', sprintf('Optimised Variables'));
-    tiledlayout(fig, nc*2+2, 1, ...
+    tiledlayout(fig, nc*2+1, 1, ...
         'TileSpacing', 'compact', ...
         'Padding', 'compact');
 
@@ -52,18 +52,18 @@ function [fig,axs] = plotOptimVariables(time, variables, nc, beta, negTimeSegmen
     % ============================
     % Plot gamma (last tile)
     % ============================
-    axg = nexttile;
+    % axg = nexttile;
 
-    plot(axg, time, gamma, 'LineWidth', 1.5);
-    grid(axg, 'on');
-    setupXAx(axg,time);
-    ylabel(axg, 'Adhesion Criteria (N)');
-    title(axg, 'Adhesion Criteria', 'Interpreter', 'none');
-    legend(axg, {'gamma'}, 'Location', 'northwest');
-    hold(axg, 'on');
+    % plot(axg, time, gamma, 'LineWidth', 1.5);
+    % grid(axg, 'on');
+    % setupXAx(axg,time);
+    % ylabel(axg, 'Adhesion Criteria (N)');
+    % title(axg, 'Adhesion Criteria', 'Interpreter', 'none');
+    % legend(axg, {'gamma'}, 'Location', 'northwest');
+    % hold(axg, 'on');
 
 
-    axs = [axs,axg];
+    % axs = [axs,axg];
     % ============================
     % Plot beta (contact-wise + envelope)
     % ============================

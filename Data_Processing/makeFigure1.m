@@ -4,21 +4,35 @@ function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate,time, wrenc
     axs = [];
     % Layout: info panel, force components, torque components, derivative panel.
     fig = figure('Color', 'w', 'Name', sprintf('Force/Torque Plot - %s', fscsvFilename));
-    tiledlayout(fig, 6, 1, ...
+    tiledlayout(fig, 5, 1, ...
         'TileSpacing', 'compact', ...
         'Padding', 'compact');
     
-    infoAx = nexttile;
-    axis(infoAx, 'off');
-    text(infoAx, 0.01, 0.5, infoText, ...
-        'Units', 'normalized', ...
-        'Interpreter', 'none', ...
-        'FontName', 'Consolas', ...
-        'FontSize', 10, ...
-        'VerticalAlignment', 'middle', ...
-        'BackgroundColor', [0.96 0.98 1.0], ...
-        'EdgeColor', [0.55 0.65 0.8], ...
-        'Margin', 10);
+    % infoAx = nexttile;
+    % axis(infoAx, 'off');
+    % text(infoAx, 0.01, 0.5, infoText, ...
+    %     'Units', 'normalized', ...
+    %     'Interpreter', 'none', ...
+    %     'FontName', 'Consolas', ...
+    %     'FontSize', 10, ...
+    %     'VerticalAlignment', 'middle', ...
+    %     'BackgroundColor', [0.96 0.98 1.0], ...
+    %     'EdgeColor', [0.55 0.65 0.8], ...
+    %     'Margin', 10);
+
+
+    ax = nexttile;
+    hold(ax,"on");
+    grid(ax, 'on');
+    
+    % plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
+    plot(ax, time, gamma, 'LineWidth', 1.5);
+    setupXAx(ax, imuData)
+    ylabel(ax, 'Adhesion Criteria (N)');
+    title(ax, 'Adhesion Crietria', 'Interpreter', 'none');
+    legend(ax, {'gamma'}, 'Location', 'southwest');
+
+    axs = [axs,ax];
     
     ax = nexttile;
     plot(ax, time, wrench(:,1:3), 'LineWidth', 1.5);
@@ -59,19 +73,6 @@ function [fig,axs] = makeFigure1(selectedRecord, csvMeta, sampleRate,time, wrenc
     ylabel('Gyroscope');
     title('Averaged Gyroscope (Sensor 1 & 2)');
     legend('GyrX','GyrY','GyrZ', 'Location', 'northwest');
-
-    axs = [axs,ax];
-
-    ax = nexttile;
-    hold(ax,"on");
-    grid(ax, 'on');
-    
-    % plot(ax, time, gamma_cnstr, 'LineWidth', 1.5);
-    plot(ax, time, gamma, 'LineWidth', 1.5);
-    setupXAx(ax, imuData)
-    ylabel(ax, 'Adhesion Criteria (N)');
-    title(ax, 'Adhesion Crietria', 'Interpreter', 'none');
-    legend(ax, {'gamma'}, 'Location', 'southwest');
 
     axs = [axs,ax];
 end

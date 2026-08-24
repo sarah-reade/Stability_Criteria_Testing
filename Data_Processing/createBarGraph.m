@@ -110,8 +110,9 @@ function createBarGraph(rootDir,outDir)
     % plot_TPR_programs(every_result,program_list,barColours);
     % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'LoopTime_ms');
     % plot_TPR_vs_X(every_result, program_list, barColours([1:4, 6:8,10:end], :),'FalsePositiveRate');
+    plot_TPR_vs_FPR_loopTime(every_result, program_list, barColours([1:4, 6:8,10:end], :));
     % plotLoopTimeByConfiguration(every_result, program_list, barColours(10:end,:));
-    plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
+    % plotTruePositiveByConfiguration(every_result, program_list, barColours(10:end,:));
     % plotTruePositiveByAngle(every_result, program_list, barColours(6:9,:));
     %% Plot stacked bars for each series
 
@@ -143,7 +144,7 @@ function createBarGraph(rootDir,outDir)
     %     barColours(7:end,:));
 
 
-    % save_figures(outDir);
+    save_figures(outDir);
 
     % create_summary_csv(every_result, program_list, outDir);
 end
@@ -760,6 +761,8 @@ for i = 1:numel(every_result)
     end
 
 end
+
+
 
 
 % ===========================
@@ -1470,5 +1473,267 @@ function plotTruePositiveByAngle(every_result, program_list, barColours)
     ax.MinorGridLineStyle = '-';
 
     hold off
+
+end
+
+
+function plot_TPR_vs_FPR_loopTime(every_result, program_list, markerColours)
+
+% ===========================
+% Plot settings
+% ===========================
+xVariable = 'FalsePositiveRate';
+fontSize = 20;
+fontName = 'Times New Roman';
+
+
+% ===========================
+% Extract data
+% ===========================
+
+TPR = zeros(numel(every_result),1);
+X = zeros(numel(every_result),1);
+loopTime = nan(numel(every_result),1);
+
+
+for i = 1:numel(every_result)
+
+    all_results = every_result{i};
+
+    if ~istable(all_results) || isempty(all_results)
+        continue
+    end
+
+
+    % Select all configurations, average over angles
+    t = all_results( ...
+        strcmp(all_results.Configuration,"all") & ...
+        strcmp(all_results.Surface,"all") & ...
+        strcmp(all_results.EM_Config,"all") & ...
+        strcmp(all_results.Angle,"all"), :);
+
+
+    if isempty(t)
+        continue
+    end
+
+
+    % Average values
+    T = groupsummary(t, ...
+        {}, ...
+        'mean', ...
+        {'TruePositiveRate','LoopTime_ms','FalsePositiveRate'});
+
+
+    % Store values
+    TPR(i) = T.mean_TruePositiveRate;
+    loopTime(i) = T.mean_LoopTime_ms;
+
+
+    switch xVariable
+
+        case 'LoopTime_ms'
+            X(i) = T.mean_LoopTime_ms;
+            labelOffset.x = 0.2;
+            labelOffset.y = 2;
+
+        case 'FalsePositiveRate'
+            X(i) = T.mean_FalsePositiveRate;
+            labelOffset.x = 2;
+            labelOffset.y = 2;
+
+        otherwise
+            error('Unknown xVariable. Use ''LoopTime_ms'' or ''FalsePositiveRate''.')
+
+    end
+
+end
+
+
+% ===========================
+% Plot
+% ===========================
+
+figure
+
+n = length(program_list);
+markerColours = markerColours(1:n,:);
+
+hold on
+
+
+% ===========================
+% Colour gradient based on
+% loop time
+% ===========================
+
+valid = ~isnan(X) & ~isnan(TPR) & ~isnan(loopTime);
+
+% Slowest -> fastest
+minLoopTime = min(loopTime(valid));
+maxLoopTime = max(loopTime(valid));
+
+% Use a colormap
+cmap = parula(256);
+colormap(cmap);
+
+% Set colour limits
+if minLoopTime == maxLoopTime
+    clim([minLoopTime-0.5 maxLoopTime+0.5]);
+else
+    clim([minLoopTime maxLoopTime]);
+end
+
+% Plot points coloured according to loop time
+scatter(X(valid), TPR(valid), 120, loopTime(valid), 'filled');
+
+
+% Colourbar
+cb = colorbar;
+cb.Label.String = 'Loop Time (ms)';
+cb.Label.FontSize = fontSize;
+cb.Label.FontName = fontName;
+
+% Make sure colourbar runs from slowest to fastest
+if minLoopTime ~= maxLoopTime
+    clim([minLoopTime maxLoopTime]);
+end
+
+
+% ===========================
+% Labels
+% ===========================
+
+for i = 1:length(program_list)
+
+    if X(i) == 0
+        continue
+    end
+
+    if strcmp(xVariable,'FalsePositiveRate') && ...
+            contains(program_list{i}, "QP") && ...
+            ~contains(program_list{i}, "ZML")
+
+        switch program_list{i}
+
+            case 'QP4'
+                dx = -3.00; dy = 0;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','right', ...
+                    'VerticalAlignment','middle', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP8'
+                dx = 3; dy = 0;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy],'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','left', ...
+                    'VerticalAlignment','middle', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP16'
+                dx = 0.02; dy = 3;
+                line([X(i) X(i)+dx],[TPR(i) TPR(i)+dy], ...
+                    'Color','k');
+                text(X(i)+dx,TPR(i)+dy,program_list{i}, ...
+                    'HorizontalAlignment','left', ...
+                    'VerticalAlignment','bottom', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+            case 'QP32'
+                dx = -3; dy = 0;
+                line([X(i) X(i)+dx], ...
+                    [TPR(i) TPR(i)+dy], ...
+                    'Color','k');
+                text(X(i)+dx, TPR(i)+dy, program_list{i}, ...
+                    'HorizontalAlignment','right', ...
+                    'VerticalAlignment','middle', ...
+                    'FontSize',fontSize-2, ...
+                    'FontName',fontName);
+
+        end
+
+        continue
+    end
+
+    if strcmp(xVariable,'LoopTime_ms') && contains(program_list{i}, "QP4")
+        dx = labelOffset.x;
+        dy = 0;
+
+        line([X(i) X(i)+dx], ...
+            [TPR(i) TPR(i)+dy], ...
+            'Color','k');
+
+        text(X(i)+dx, ...
+            TPR(i)+dy, ...
+            program_list{i}, ...
+            'HorizontalAlignment','left', ...
+            'VerticalAlignment','bottom', ...
+            'FontSize',fontSize-2, ...
+            'FontName',fontName);
+
+        continue
+    end
+
+    dx = labelOffset.x;
+    dy = labelOffset.y;
+
+    line([X(i) X(i)+dx], ...
+        [TPR(i) TPR(i)+dy], ...
+        'Color','k');
+
+    text(X(i)+dx, ...
+        TPR(i)+dy, ...
+        program_list{i}, ...
+        'HorizontalAlignment','left', ...
+        'VerticalAlignment','bottom', ...
+        'FontSize',fontSize-2, ...
+        'FontName',fontName);
+
+end
+
+
+% ===========================
+% Formatting
+% ===========================
+
+switch xVariable
+
+    case 'LoopTime_ms'
+        xlabel('Loop Time (ms)',...
+               'FontSize',fontSize*1.5,...
+               'FontName',fontName,...
+               'FontWeight','bold');
+        ylim([0 100])
+
+    case 'FalsePositiveRate'
+        xlabel('False Positive Rate (%)',...
+               'FontSize',fontSize*1.5,...
+               'FontName',fontName,...
+               'FontWeight','bold');
+        axis equal
+        xlim([0 50])
+        ylim([30 100])
+
+end
+
+
+ylabel('True Positive Rate (%)',...
+       'FontSize',fontSize*1.5,...
+       'FontName',fontName,...
+       'FontWeight','bold');
+
+
+grid on
+
+ax = gca;
+ax.FontSize = fontSize;
+ax.FontName = fontName;
+
+hold off
 
 end
