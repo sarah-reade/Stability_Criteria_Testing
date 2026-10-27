@@ -11,7 +11,7 @@ dataRegPath = fullfile(dataDir, 'Data_Reg.csv');
 
 dataReg = getDataReg(dataRegPath);
 
-calculationMethods = {'SOCP', 'QP4', 'QP8', 'QP16', 'QP32','QP3D','ZML', 'SOCPZML', 'QP8ZML'};
+calculationMethods = {'SOCP', 'QP4', 'QP8', 'QP16', 'QP32','QP3D','ZML', 'SOCPZML', 'QP8ZML'}; % 'SOCP_Fast', doesn't work
 
 if runSelection
     [processDataParams,selectedIdxs] = runSelectionUi(dataReg,calculationMethods);
@@ -137,6 +137,7 @@ for selectionIdx = 1:numel(selectedIdxs)
         msg = sprintf(['Failed to obtain adhesion criteria:\n\n%s\n\n' ...
                     'Function: %s\nLine: %d'], ...
                     ME.message, ME.stack(1).name, ME.stack(1).line);
+        disp(msg);
         errordlg(msg, 'Adhesion Calculation Error');
         continue;
     end

@@ -1574,7 +1574,22 @@ minLoopTime = min(loopTime(valid));
 maxLoopTime = max(loopTime(valid));
 
 % Use a colormap
-cmap = parula(256);
+cmap = [
+    0.00  0.80  0.00   % Green
+    1.00  1.00  0.00   % Yellow
+    1.00  0.00  0.00   % Red
+];
+
+% More rapid colour change around the middle
+x = linspace(0,1,256);
+xWarped = 0.5 + 0.5 * sign(x-0.5) .* ...
+          (2*abs(x-0.5)).^2;
+
+cmap = interp1( ...
+    [0 0.5 1], ...
+    cmap, ...
+    xWarped);
+
 colormap(cmap);
 
 % Set colour limits

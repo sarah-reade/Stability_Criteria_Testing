@@ -17,6 +17,8 @@ function [variables,gamma_cnstr,beta,all_beta,loopTime] = obtainAdhesionCriteria
     switch method
         case 'SOCP'
             [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCP(parameters,wrench);
+        case 'SOCP_Fast'
+            [variables,gamma_cnstr,beta,all_beta,loopTime] = SOCP_Fast(parameters,wrench);
         case 'ZML'
             [gamma_cnstr,all_beta,loopTime] = ZML(parameters,wrench);
             beta = gamma_cnstr;

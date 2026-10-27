@@ -3,7 +3,7 @@
 // Ethernet Interface
 #include "ethernet.hpp"
 
-byte mac[] = {/home/ewalker/Downloads/ST_Servo (1)/ST Servo/ServoDriverST/ServoDriverST.ino
+byte mac[] = {
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 IPAddress ip(192, 168, 1, 177);
